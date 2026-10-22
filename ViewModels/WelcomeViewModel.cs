@@ -38,6 +38,12 @@ public sealed partial class WelcomeViewModel : ViewModelBase
             CurrentPage = initialPage;
     }
 
+    /// <summary>New versions from GitHub releases; offered under the version.</summary>
+    public UpdateService Updates { get; init; } = new(null);
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private Task InstallUpdate() => Updates.InstallAsync(() => { });
+
     public string AppVersion { get; } =
         "версія " + (typeof(WelcomeViewModel).Assembly.GetName().Version?.ToString(3) ?? "0.0.0");
 

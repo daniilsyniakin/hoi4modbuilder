@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build hoi4modbuilder.slnx -c Release
+
+      # Tests that need an installed Hearts of Iron IV skip themselves on the runner.
+      - name: Test
+        run: dotnet test hoi4modbuilder.slnx -c Release --no-build

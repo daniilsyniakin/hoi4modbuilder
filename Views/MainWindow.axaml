@@ -81,6 +81,11 @@
           <MenuItem Header="{Binding UndoHeader}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
           <MenuItem Header="{Binding RedoHeader}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Shift+Z" />
         </MenuItem>
+        <MenuItem Header="_Довідка">
+          <MenuItem Header="Перевірити оновлення" Command="{Binding CheckUpdatesCommand}" />
+          <Separator />
+          <MenuItem Header="{Binding VersionText}" IsEnabled="False" />
+        </MenuItem>
         <MenuItem Header="_Вигляд">
           <MenuItem Header="Панель проєкту" ToggleType="CheckBox"
                     IsChecked="{Binding IsProjectPanelVisible, Mode=OneWay}"
@@ -104,6 +109,16 @@
           <TextBlock Text="{Binding StatusMessage}" Classes="missing" MaxWidth="520"
                      TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusMessage}"
                      IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <!-- Updates: a button when one is ready, a short note after a manual check -->
+          <Button Classes="flat update" Padding="6,1" MinHeight="0" VerticalAlignment="Center"
+                  IsVisible="{Binding Updates.IsVisible}" IsEnabled="{Binding Updates.CanInstall}"
+                  Command="{Binding InstallUpdateCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <PathIcon Data="{StaticResource IconBack}" Width="11" Height="11" RenderTransform="rotate(90deg)"
+                        Foreground="{DynamicResource AccentHoverBrush}" IsVisible="{Binding Updates.CanInstall}" />
+              <TextBlock Text="{Binding Updates.StatusText}" />
+            </StackPanel>
+          </Button>
           <Button Classes="flat" Padding="6,1" MinHeight="0" VerticalAlignment="Center"
                   Command="{Binding ToggleProblemsPanelCommand}" ToolTip.Tip="Проблеми (Alt+6)">
             <StackPanel Orientation="Horizontal" Spacing="5">

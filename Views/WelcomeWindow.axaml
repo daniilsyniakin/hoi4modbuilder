@@ -32,6 +32,11 @@
           <StackPanel VerticalAlignment="Center">
             <TextBlock Text="HoI4 Mod Builder" FontWeight="SemiBold" />
             <TextBlock Text="{Binding AppVersion}" Classes="secondary" FontSize="12" />
+            <Button Classes="flat" Padding="0,2" MinHeight="0" Margin="0,2,0,0" HorizontalAlignment="Left"
+                    IsVisible="{Binding Updates.IsVisible}" IsEnabled="{Binding Updates.CanInstall}"
+                    Command="{Binding InstallUpdateCommand}">
+              <TextBlock Text="{Binding Updates.StatusText}" FontSize="12" Foreground="{DynamicResource AccentHoverBrush}" />
+            </Button>
           </StackPanel>
         </StackPanel>
 

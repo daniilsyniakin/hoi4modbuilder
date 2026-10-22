@@ -23,8 +23,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly ModFileWatcher? _watcher;
     private bool _disposed;
 
-    public MainWindowViewModel(ModProject mod, SettingsStore settings, IPlatformService platform, IWorkspaceHost host)
+    public MainWindowViewModel(ModProject mod, SettingsStore settings, IPlatformService platform, IWorkspaceHost host,
+        UpdateService? updates = null)
     {
+        Updates = updates ?? new UpdateService(null);
         Mod = mod;
         _settings = settings;
         _platform = platform;
@@ -77,6 +79,24 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     /// <summary>Mistakes found in the mod, for the problems panel and the editors.</summary>
     public ProblemsService Problems { get; }
+
+    // ── Updates ────────────────────────────────────────────────
+
+    /// <summary>New versions from GitHub releases, shown in the status bar.</summary>
+    public UpdateService Updates { get; }
+
+    public string VersionText => $"HoI4 Mod Builder {Updates.CurrentVersion}";
+
+    [RelayCommand]
+    private Task CheckUpdates() => Updates.CheckAsync(manual: true);
+
+    /// <summary>Saves everything, then downloads the update and restarts into it.</summary>
+    [RelayCommand]
+    private Task InstallUpdate() => Updates.InstallAsync(() =>
+    {
+        foreach (var tab in Tabs)
+            tab.Flush();
+    });
 
     // ── Creating entities ──────────────────────────────────────
 

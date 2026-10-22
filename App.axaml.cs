@@ -14,6 +14,7 @@ public partial class App : Application, IWorkspaceHost
     private SettingsStore _settings = null!;
     private IClassicDesktopStyleApplicationLifetime? _desktop;
     private Window? _currentWindow;
+    private UpdateService _updates = null!;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -23,6 +24,8 @@ public partial class App : Application, IWorkspaceHost
         {
             _desktop = desktop;
             _settings = SettingsStore.Load();
+            _updates = new UpdateService(UpdateService.RepositoryUrl);
+            _ = _updates.CheckAsync(manual: false);
             if (!TryOpenFromCommandLine(desktop.Args))
                 ShowWelcome();
         }
@@ -34,14 +37,14 @@ public partial class App : Application, IWorkspaceHost
     {
         _settings.AddRecent(mod.Name, mod.RootPath);
         var window = new MainWindow();
-        window.DataContext = new MainWindowViewModel(mod, _settings, new PlatformService(window, _settings), this);
+        window.DataContext = new MainWindowViewModel(mod, _settings, new PlatformService(window, _settings), this, _updates);
         SwitchTo(window);
     }
 
     public void ShowWelcome(WelcomePage page = WelcomePage.Mods)
     {
         var window = new WelcomeWindow();
-        window.DataContext = new WelcomeViewModel(_settings, new PlatformService(window, _settings), this, page);
+        window.DataContext = new WelcomeViewModel(_settings, new PlatformService(window, _settings), this, page) { Updates = _updates };
         SwitchTo(window);
     }
 
