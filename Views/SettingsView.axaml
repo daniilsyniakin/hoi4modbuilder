@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HoI4ModBuilder.ViewModels"
+             x:Class="HoI4ModBuilder.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  <StackPanel Spacing="6">
+    <TextBlock Text="Папка гри Hearts of Iron IV" />
+    <Grid ColumnDefinitions="*,Auto,Auto">
+      <TextBox Text="{Binding GamePath}" PlaceholderText="…\steamapps\common\Hearts of Iron IV" />
+      <Button Grid.Column="1" Classes="secondary" Padding="8,5" Margin="6,0,0,0"
+              Command="{Binding BrowseGamePathCommand}" ToolTip.Tip="Огляд…">
+        <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" />
+      </Button>
+      <Button Grid.Column="2" Classes="secondary" Margin="6,0,0,0" Content="Знайти автоматично"
+              Command="{Binding DetectGamePathCommand}" />
+    </Grid>
+    <TextBlock Text="{Binding GameStatus}" FontSize="12" Classes="secondary"
+               Classes.missing="{Binding !IsGameFound}" Margin="0,0,0,16" />
+
+    <TextBlock Text="Папка модів лаунчера" />
+    <Grid ColumnDefinitions="*,Auto">
+      <TextBox Text="{Binding ModsDirectory}" />
+      <Button Grid.Column="1" Classes="secondary" Padding="8,5" Margin="6,0,0,0"
+              Command="{Binding BrowseModsDirectoryCommand}" ToolTip.Tip="Огляд…">
+        <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" />
+      </Button>
+    </Grid>
+    <TextBlock FontSize="12" Classes="secondary" TextWrapping="Wrap"
+               Text="Сюди записуються .mod-файли, за якими лаунчер Paradox знаходить ваші моди." />
+  </StackPanel>
+</UserControl>

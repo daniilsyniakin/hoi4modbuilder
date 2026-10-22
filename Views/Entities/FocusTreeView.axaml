@@ -1,0 +1,180 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ent="using:HoI4ModBuilder.ViewModels.Entities"
+             xmlns:graph="using:HoI4ModBuilder.Views.Graph"
+             xmlns:views="using:HoI4ModBuilder.Views.Entities"
+             xmlns:conv="using:HoI4ModBuilder.Views.Converters"
+             x:Class="HoI4ModBuilder.Views.Entities.FocusTreeView"
+             x:DataType="ent:FocusTreeTabViewModel">
+  <UserControl.Styles>
+    <!-- Problems found by the mod check -->
+    <Style Selector="Border.badge">
+      <Setter Property="Background" Value="#E61E1F22" />
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Padding" Value="2" />
+    </Style>
+    <Style Selector="Border.focus-node">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Border.focus-node:pointerover">
+      <Setter Property="Background" Value="#14FFFFFF" />
+    </Style>
+    <Style Selector="Border.focus-node.selected">
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Background" Value="#223574F0" />
+    </Style>
+    <Style Selector="Border.focus-node.link-source">
+      <Setter Property="BorderBrush" Value="#E0A15A" />
+    </Style>
+    <Style Selector="Border.focus-plate">
+      <Setter Property="Background" Value="#E6202226" />
+      <Setter Property="BorderBrush" Value="#5A4E33" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Padding" Value="4,2" />
+      <Setter Property="Margin" Value="2,0" />
+    </Style>
+    <Style Selector="Border.focus-node.shared Border.focus-plate">
+      <Setter Property="BorderBrush" Value="#3B6E8F" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid ColumnDefinitions="*,1,340">
+    <DockPanel>
+      <!-- Toolbar -->
+      <Border DockPanel.Dock="Top" Height="34" Padding="8,0"
+              BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,0,0,1">
+        <Grid ColumnDefinitions="Auto,*">
+          <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+            <Button Classes="flat" Padding="5" MinHeight="0" Click="OnZoomOut" ToolTip.Tip="Зменшити (коліщатко)">
+              <PathIcon Data="{StaticResource IconMinus}" Width="12" Height="12" />
+            </Button>
+            <TextBlock x:Name="ZoomText" Width="48" TextAlignment="Center" VerticalAlignment="Center"
+                       Classes="secondary" FontSize="12" />
+            <Button Classes="flat" Padding="5" MinHeight="0" Click="OnZoomIn" ToolTip.Tip="Збільшити (коліщатко)">
+              <PathIcon Data="{StaticResource IconPlus}" Width="12" Height="12" />
+            </Button>
+            <Button Classes="flat" Padding="8,3" MinHeight="0" Margin="6,0,0,0" Content="Вмістити" Click="OnFit" />
+            <Border Width="1" Height="16" Margin="8,0" Background="{DynamicResource SeparatorBrush}" />
+            <Button Classes="flat" Padding="8,3" MinHeight="0" Click="OnAddFocus"
+                    ToolTip.Tip="Новий фокус">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <PathIcon Data="{StaticResource IconPlus}" Width="11" Height="11" />
+                <TextBlock Text="Фокус" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Panel>
+        <graph:GraphSurface x:Name="Surface" Background="{DynamicResource WindowBgBrush}"
+                            ViewTransform="{Binding ViewTransform}">
+          <Canvas x:Name="World" Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}">
+            <graph:GraphEdgesControl Edges="{Binding RelativeEdges}" Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}" />
+            <graph:GraphEdgesControl Edges="{Binding Edges}" Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}" />
+            <ItemsControl ItemsSource="{Binding Nodes}" Classes="graph-nodes"
+                          Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}">
+              <ItemsControl.Styles>
+                <Style Selector="ItemsControl.graph-nodes > ContentPresenter" x:DataType="ent:FocusNodeViewModel">
+                  <Setter Property="Canvas.Left" Value="{Binding X}" />
+                  <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                </Style>
+              </ItemsControl.Styles>
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <Canvas />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="ent:FocusNodeViewModel">
+                  <Border Classes="focus-node" Classes.selected="{Binding IsSelected}"
+                          Classes.link-source="{Binding IsLinkSource}" Classes.shared="{Binding IsShared}"
+                          Width="{Binding Width}" Height="{Binding Height}">
+                    <ToolTip.Tip>
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Id}" FontFamily="{StaticResource EditorFont}" FontSize="11" Opacity="0.7" />
+                        <TextBlock Text="{Binding CostText}" FontSize="11" Opacity="0.7"
+                                   IsVisible="{Binding CostText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      </StackPanel>
+                    </ToolTip.Tip>
+                    <Border.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Зробити передумовою для…"
+                                  Command="{Binding $parent[UserControl].((ent:FocusTreeTabViewModel)DataContext).StartPrerequisiteLinkCommand}"
+                                  CommandParameter="{Binding}" />
+                        <MenuItem Header="Взаємовиключний з…"
+                                  Command="{Binding $parent[UserControl].((ent:FocusTreeTabViewModel)DataContext).StartExclusiveLinkCommand}"
+                                  CommandParameter="{Binding}" />
+                        <Separator />
+                        <MenuItem Header="Перейменувати…" InputGesture="F2"
+                                  Command="{Binding $parent[UserControl].((ent:FocusTreeTabViewModel)DataContext).RenameFocusCommand}"
+                                  CommandParameter="{Binding}">
+                          <MenuItem.Icon>
+                            <PathIcon Data="{StaticResource IconPencil}" Width="11" Height="11" />
+                          </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="Відкрити в коді"
+                                  Command="{Binding $parent[UserControl].((ent:FocusTreeTabViewModel)DataContext).OpenFocusInCodeCommand}"
+                                  CommandParameter="{Binding}" />
+                        <Separator />
+                        <MenuItem Header="Видалити фокус"
+                                  Command="{Binding $parent[UserControl].((ent:FocusTreeTabViewModel)DataContext).DeleteFocusCommand}"
+                                  CommandParameter="{Binding}">
+                          <MenuItem.Icon>
+                            <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" />
+                          </MenuItem.Icon>
+                        </MenuItem>
+                      </ContextMenu>
+                    </Border.ContextMenu>
+                    <Panel>
+                    <StackPanel Margin="0,4,0,0" Spacing="2">
+                      <Panel Height="62">
+                        <Image Source="{Binding Icon}" MaxWidth="92" MaxHeight="62" Stretch="Uniform"
+                               RenderOptions.BitmapInterpolationMode="HighQuality" />
+                        <PathIcon Data="{StaticResource IconFocus}" Width="40" Height="40"
+                                  Foreground="{DynamicResource ContentIconFocusBrush}" IsVisible="{Binding !HasIcon}" />
+                      </Panel>
+                      <Border Classes="focus-plate">
+                        <TextBlock Text="{Binding Title}" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"
+                                   MaxLines="2" TextTrimming="CharacterEllipsis" LineHeight="13" />
+                      </Border>
+                    </StackPanel>
+                      <Border Classes="badge" Classes.error="{Binding HasError}" IsVisible="{Binding HasProblems}"
+                              HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,14,0"
+                              ToolTip.Tip="{Binding ProblemText}">
+                        <PathIcon Width="14" Height="14"
+                                  Data="{Binding Severity, Converter={x:Static conv:ProblemIcons.Geometry}}"
+                                  Foreground="{Binding Severity, Converter={x:Static conv:ProblemIcons.Brush}}" />
+                      </Border>
+                    </Panel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <!-- The link being drawn, above the nodes -->
+            <graph:GraphEdgesControl Edges="{Binding PreviewEdges}" Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}" />
+          </Canvas>
+        </graph:GraphSurface>
+
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6"
+                    IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <PathIcon Data="{StaticResource IconWarning}" Width="20" Height="20" Foreground="{DynamicResource ErrorBrush}" />
+          <TextBlock Text="{Binding Error}" Classes="secondary" TextWrapping="Wrap" MaxWidth="480" TextAlignment="Center" />
+        </StackPanel>
+      </Panel>
+    </DockPanel>
+
+    <Border Grid.Column="1" Background="{DynamicResource SeparatorBrush}" />
+
+    <!-- Properties of the selected focus -->
+    <Panel Grid.Column="2" Background="{DynamicResource PanelBgBrush}">
+      <views:PropertyPanel DataContext="{Binding Panel}" IsVisible="{Binding $parent[UserControl].((ent:FocusTreeTabViewModel)DataContext).Panel, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    </Panel>
+  </Grid>
+</UserControl>

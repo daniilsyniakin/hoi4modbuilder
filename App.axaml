@@ -1,0 +1,17 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HoI4ModBuilder.App"
+             RequestedThemeVariant="Dark">
+  <Application.Resources>
+    <!-- Fluent derives focus rings, check marks etc. from the system accent; pin it to the JetBrains blue. -->
+    <Color x:Key="SystemAccentColor">#3574F0</Color>
+    <Color x:Key="SystemAccentColorLight1">#4682FA</Color>
+    <Color x:Key="SystemAccentColorDark1">#2B63D9</Color>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" />
+    <StyleInclude Source="avares://HoI4ModBuilder/Styles/Theme.axaml" />
+  </Application.Styles>
+</Application>

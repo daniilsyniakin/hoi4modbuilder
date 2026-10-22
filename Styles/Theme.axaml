@@ -1,0 +1,402 @@
+<!-- Dark palette and control styles modelled on the JetBrains "New UI" dark theme. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <SolidColorBrush x:Key="WindowBgBrush" Color="#1E1F22" />
+    <SolidColorBrush x:Key="PanelBgBrush" Color="#2B2D30" />
+    <SolidColorBrush x:Key="FieldBgBrush" Color="#1E1F22" />
+    <SolidColorBrush x:Key="SeparatorBrush" Color="#393B40" />
+    <SolidColorBrush x:Key="ControlBorderBrush" Color="#4E5157" />
+    <SolidColorBrush x:Key="TextBrush" Color="#DFE1E5" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#868A91" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#3574F0" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#4682FA" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#2B63D9" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#393B40" />
+    <SolidColorBrush x:Key="PressedBrush" Color="#43454A" />
+    <SolidColorBrush x:Key="SelectionBrush" Color="#2E436E" />
+    <SolidColorBrush x:Key="ErrorBrush" Color="#F75464" />
+    <SolidColorBrush x:Key="ErrorBgBrush" Color="#3D2328" />
+    <SolidColorBrush x:Key="ErrorBorderBrush" Color="#6E2B33" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="#5FB865" />
+    <SolidColorBrush x:Key="WarningBrush" Color="#E2B341" />
+
+    <!-- 16×16 icons -->
+    <StreamGeometry x:Key="IconPlus">M7.25 2h1.5v5.25H14v1.5H8.75V14h-1.5V8.75H2v-1.5h5.25z</StreamGeometry>
+    <StreamGeometry x:Key="IconFolder">M1.5 3.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v7.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z</StreamGeometry>
+    <StreamGeometry x:Key="IconSearch">F1 M6.5 1a5.5 5.5 0 0 1 4.38 8.83l3.65 3.64-1.06 1.06-3.64-3.65A5.5 5.5 0 1 1 6.5 1zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8z</StreamGeometry>
+    <StreamGeometry x:Key="IconGrid">M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z</StreamGeometry>
+    <StreamGeometry x:Key="IconSliders">M2 3.25h12v1.5H2zM2 7.25h12v1.5H2zM2 11.25h12v1.5H2zM9 1.5h2v4.5H9zM4 5.5h2v4.5H4zM10 9.5h2v4.5h-2z</StreamGeometry>
+    <StreamGeometry x:Key="IconMore">M3 6.75a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5zm5 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5zm5 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5z</StreamGeometry>
+    <StreamGeometry x:Key="IconBack">M6.5 3 1.5 8l5 5 1.06-1.06-3.19-3.19H14.5v-1.5H4.37l3.19-3.19z</StreamGeometry>
+    <StreamGeometry x:Key="IconClose">M3.5 2.44 8 6.94l4.5-4.5 1.06 1.06L9.06 8l4.5 4.5-1.06 1.06L8 9.06l-4.5 4.5-1.06-1.06L6.94 8l-4.5-4.5z</StreamGeometry>
+    <StreamGeometry x:Key="IconWarning">F1 M8 1.5l7 12.5H1zM7.25 6v4h1.5V6zm0 5v1.5h1.5V11z</StreamGeometry>
+    <StreamGeometry x:Key="IconFile">F1 M3 1h6.5L13 4.5V15H3zM9 2v3.5h3.5z</StreamGeometry>
+    <StreamGeometry x:Key="IconScript">F1 M3 1h6.5L13 4.5V15H3zM5 7h6v1H5zM5 9.5h6v1H5zM5 12h4v1H5z</StreamGeometry>
+    <StreamGeometry x:Key="IconLocalisation">M2 2.5h12v8.5H7l-3.5 3v-3H2z</StreamGeometry>
+    <StreamGeometry x:Key="IconInterface">F1 M1.5 2h13v12h-13zM3 5h10v7.5H3z</StreamGeometry>
+    <StreamGeometry x:Key="IconImage">F1 M1.5 2.5h13v11h-13zM3 12h10l-3.5-4.5-2.5 3-1.5-1.5zM5 4.25a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5z</StreamGeometry>
+    <StreamGeometry x:Key="IconData">F1 M1.5 2h13v12h-13zM3 5h4.25v3H3zM8.75 5H13v3H8.75zM3 9.5h4.25v3H3zM8.75 9.5H13v3H8.75z</StreamGeometry>
+    <StreamGeometry x:Key="IconChevronDown">M3.5 5.5 8 10l4.5-4.5 1.06 1.06L8 12.12 2.44 6.56z</StreamGeometry>
+    <StreamGeometry x:Key="IconCheck">M6.25 11.5 2.5 7.75l1.06-1.06 2.69 2.69 6.19-6.19 1.06 1.06z</StreamGeometry>
+    <StreamGeometry x:Key="IconMinus">M2.5 7.25h11v1.5h-11z</StreamGeometry>
+    <StreamGeometry x:Key="IconCollapseAll">M3.5 7.5 8 3l4.5 4.5-1.06 1.06L8 5.12 4.56 8.56zM3.5 12.5 8 8l4.5 4.5-1.06 1.06L8 10.12l-3.44 3.44z</StreamGeometry>
+
+    <!-- Content view: one icon per kind of game entity -->
+    <StreamGeometry x:Key="IconFocusTree">M6 1.5h4V5H6zM2 11h4v3.5H2zM10 11h4v3.5h-4zM7.25 5h1.5v2.25h4V11h-1.5V8.75h-6.5V11h-1.5V7.25h4z</StreamGeometry>
+    <StreamGeometry x:Key="IconFocus">M3 2h10v9.5L8 15l-5-3.5z</StreamGeometry>
+    <StreamGeometry x:Key="IconEvent">F1 M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zM7.25 4v5h1.5V4zm0 6.5V12h1.5v-1.5z</StreamGeometry>
+    <StreamGeometry x:Key="IconIdea">M8 1a5 5 0 0 1 3 9v2H5v-2a5 5 0 0 1 3-9zM5.5 13h5v1.5h-5z</StreamGeometry>
+    <StreamGeometry x:Key="IconDecision">M3 1.5h1.5V15H3zM5.5 2h8l-2 3.25 2 3.25h-8z</StreamGeometry>
+    <StreamGeometry x:Key="IconTechnology">M5.5 1.5h5V3h-.75v3.5L14 14.5H2l4.25-8V3H5.5z</StreamGeometry>
+    <StreamGeometry x:Key="IconCharacter">M8 1.5a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM2.5 14.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5z</StreamGeometry>
+    <StreamGeometry x:Key="IconCountry">M8 1l6 2v4.5c0 3.5-2.5 6.25-6 7.5-3.5-1.25-6-4-6-7.5V3z</StreamGeometry>
+    <StreamGeometry x:Key="IconState">F1 M8 1a5 5 0 0 1 5 5c0 3.5-5 9-5 9S3 9.5 3 6a5 5 0 0 1 5-5zm0 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4z</StreamGeometry>
+    <StreamGeometry x:Key="IconEffect">M9.5 1 3 9h4.5l-1 6L13 7H8.5z</StreamGeometry>
+    <StreamGeometry x:Key="IconPencil">M11.25 1.25 14.75 4.75 5.5 14H2v-3.5zM10.2 3.4 12.6 5.8l1-1L11.2 2.4z</StreamGeometry>
+    <StreamGeometry x:Key="IconTarget">F1 M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM8 5.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z</StreamGeometry>
+    <StreamGeometry x:Key="IconSwap">M11 1.5 14.5 5 11 8.5V6H3V4h8zM5 7.5V10h8v2H5v2.5L1.5 11z</StreamGeometry>
+    <StreamGeometry x:Key="IconError">F1 M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zM5.6 4.5 4.5 5.6 6.9 8l-2.4 2.4 1.1 1.1L8 9.1l2.4 2.4 1.1-1.1L9.1 8l2.4-2.4-1.1-1.1L8 6.9z</StreamGeometry>
+    <StreamGeometry x:Key="IconTrigger">M1.5 2.5h13l-5 6V14l-3-1.5v-4z</StreamGeometry>
+
+    <SolidColorBrush x:Key="FileIconFolderBrush" Color="#8CA3BE" />
+    <SolidColorBrush x:Key="FileIconScriptBrush" Color="#A9B1BA" />
+    <SolidColorBrush x:Key="FileIconLocalisationBrush" Color="#E8BF6A" />
+    <SolidColorBrush x:Key="FileIconInterfaceBrush" Color="#C792EA" />
+    <SolidColorBrush x:Key="FileIconImageBrush" Color="#6AAB73" />
+    <SolidColorBrush x:Key="FileIconDescriptorBrush" Color="#E0A15A" />
+    <SolidColorBrush x:Key="FileIconDataBrush" Color="#5FB3B3" />
+    <SolidColorBrush x:Key="FileIconOtherBrush" Color="#868A91" />
+
+    <SolidColorBrush x:Key="ContentIconFocusTreeBrush" Color="#6AAB73" />
+    <SolidColorBrush x:Key="ContentIconFocusBrush" Color="#6AAB73" />
+    <SolidColorBrush x:Key="ContentIconEventBrush" Color="#E8BF6A" />
+    <SolidColorBrush x:Key="ContentIconIdeaBrush" Color="#F2C55C" />
+    <SolidColorBrush x:Key="ContentIconDecisionBrush" Color="#F75464" />
+    <SolidColorBrush x:Key="ContentIconTechnologyBrush" Color="#5FB3B3" />
+    <SolidColorBrush x:Key="ContentIconCharacterBrush" Color="#C792EA" />
+    <SolidColorBrush x:Key="ContentIconCountryBrush" Color="#548AF7" />
+    <SolidColorBrush x:Key="ContentIconStateBrush" Color="#E0A15A" />
+    <SolidColorBrush x:Key="ContentIconScriptedEffectBrush" Color="#A9B1BA" />
+    <SolidColorBrush x:Key="ContentIconScriptedTriggerBrush" Color="#A9B1BA" />
+
+    <SolidColorBrush x:Key="EditorLineNumberBrush" Color="#4B5059" />
+
+    <!-- Transparency background for image previews -->
+    <DrawingBrush x:Key="CheckerboardBrush" TileMode="Tile" DestinationRect="0,0,16,16">
+      <DrawingBrush.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="#2B2D30" Geometry="M0,0 H16 V16 H0 Z" />
+          <GeometryDrawing Brush="#3A3C41" Geometry="M0,0 H8 V8 H0 Z M8,8 H16 V16 H8 Z" />
+        </DrawingGroup>
+      </DrawingBrush.Drawing>
+    </DrawingBrush>
+    <FontFamily x:Key="EditorFont">JetBrains Mono, Cascadia Mono, Consolas, Menlo, monospace</FontFamily>
+    <x:Double x:Key="TreeViewItemMinHeight">24</x:Double>
+  </Styles.Resources>
+
+  <Style Selector=":is(Window)">
+    <Setter Property="Background" Value="{DynamicResource WindowBgBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <!-- Text -->
+  <Style Selector="TextBlock.secondary">
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="TextBlock.h1">
+    <Setter Property="FontSize" Value="18" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.label">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+  </Style>
+
+  <!-- Buttons: shared shape -->
+  <Style Selector="Button">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="14,5" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <!-- Primary (filled blue) -->
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentPressedBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentPressedBrush}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="Opacity" Value="0.45" />
+  </Style>
+
+  <!-- Danger (destructive confirmation) -->
+  <Style Selector="Button.primary.danger">
+    <Setter Property="Background" Value="#C94F4F" />
+    <Setter Property="BorderBrush" Value="#C94F4F" />
+  </Style>
+  <Style Selector="Button.primary.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#DB5C5C" />
+    <Setter Property="BorderBrush" Value="#DB5C5C" />
+  </Style>
+  <Style Selector="Button.primary.danger:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#B54343" />
+    <Setter Property="BorderBrush" Value="#B54343" />
+  </Style>
+
+  <!-- Secondary (outlined) -->
+  <Style Selector="Button.secondary">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+  <Style Selector="Button.secondary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+  <Style Selector="Button.secondary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PressedBrush}" />
+  </Style>
+
+  <!-- Flat (toolbar/icon buttons, list rows) -->
+  <Style Selector="Button.flat">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="6" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+  <Style Selector="Button.flat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+  <Style Selector="Button.flat:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PressedBrush}" />
+  </Style>
+
+  <!-- Recent mod rows -->
+  <Style Selector="Button.recent">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Padding" Value="10,8" />
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+  <Style Selector="Button.recent Button.more">
+    <Setter Property="Opacity" Value="0" />
+  </Style>
+  <Style Selector="Button.recent:pointerover Button.more">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="TextBlock.missing">
+    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+  </Style>
+
+  <!-- Text fields -->
+  <Style Selector="TextBox">
+    <Setter Property="Background" Value="{DynamicResource FieldBgBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="Padding" Value="8,5" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource FieldBgBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+  </Style>
+  <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource FieldBgBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <!-- Sidebar navigation -->
+  <Style Selector="ListBox.nav">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem">
+    <Setter Property="Padding" Value="10,7" />
+    <Setter Property="Margin" Value="0,1" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SelectionBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SelectionBrush}" />
+  </Style>
+
+  <!-- Tag chips -->
+  <Style Selector="ToggleButton.chip">
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="10,3" />
+    <Setter Property="Margin" Value="0,0,6,6" />
+    <Setter Property="MinHeight" Value="24" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+  </Style>
+  <Style Selector="ToggleButton.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+  <Style Selector="ToggleButton.chip:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SelectionBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+
+  <!-- Menu bar -->
+  <Style Selector="Menu.main">
+    <Setter Property="Background" Value="{DynamicResource PanelBgBrush}" />
+    <Setter Property="Padding" Value="4,2" />
+  </Style>
+  <Style Selector="Menu.main > MenuItem">
+    <Setter Property="Padding" Value="10,4" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+
+  <!-- Tool window stripe (left edge) -->
+  <Style Selector="ToggleButton.stripe">
+    <Setter Property="Width" Value="30" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="ToggleButton.stripe:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+  </Style>
+  <Style Selector="ToggleButton.stripe:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <!-- Tool window header -->
+  <Style Selector="TextBlock.tool-title">
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <!-- Project tree -->
+  <!-- Dense lists: the problems panel and the command picker -->
+  <Style Selector="ListBox.dense ListBoxItem">
+    <Setter Property="Padding" Value="8,3" />
+    <Setter Property="MinHeight" Value="0" />
+  </Style>
+
+  <!-- Entities with problems in the content tree -->
+  <Style Selector="TreeView.project TextBlock.error">
+    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+  </Style>
+  <Style Selector="TreeView.project TextBlock.warning">
+    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+  </Style>
+  <Style Selector="TreeView.project">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="4,0" />
+  </Style>
+  <Style Selector="TreeView.project TreeViewItem">
+    <Setter Property="Padding" Value="2,0" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+  <!-- :pointerover on the row border itself; on the item it would also light up every ancestor. -->
+  <Style Selector="TreeView.project TreeViewItem /template/ Border#PART_LayoutRoot:pointerover">
+    <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+  </Style>
+  <Style Selector="TreeView.project TreeViewItem:selected /template/ Border#PART_LayoutRoot">
+    <Setter Property="Background" Value="{DynamicResource PressedBrush}" />
+  </Style>
+  <Style Selector="TreeView.project:focus-within TreeViewItem:selected /template/ Border#PART_LayoutRoot">
+    <Setter Property="Background" Value="{DynamicResource SelectionBrush}" />
+  </Style>
+  <Style Selector="TreeView.project TreeViewItem:selected /template/ ContentPresenter#PART_HeaderPresenter">
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+
+  <!-- Editor tabs -->
+  <Style Selector="ListBox.tabs">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+    <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+  </Style>
+  <Style Selector="ListBox.tabs ListBoxItem">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="ListBox.tabs ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PanelBgBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+  <Style Selector="ListBox.tabs ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+  <Style Selector="ListBox.tabs ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PanelBgBrush}" />
+  </Style>
+  <Style Selector="ListBox.tabs ListBoxItem Border.tab">
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="ListBox.tabs ListBoxItem:selected Border.tab">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+  <Style Selector="ListBox.tabs ListBoxItem Button.tab-close">
+    <Setter Property="Opacity" Value="0" />
+  </Style>
+  <Style Selector="ListBox.tabs ListBoxItem:pointerover Button.tab-close, ListBox.tabs ListBoxItem:selected Button.tab-close">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+
+  <!-- Status bar -->
+  <Style Selector="Border.status-bar TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="Border.status-bar TextBlock.missing">
+    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+  </Style>
+  <Style Selector="Button.status-problems PathIcon">
+    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+  </Style>
+  <Style Selector="Button.status-problems PathIcon.has-errors">
+    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+  </Style>
+
+  <!-- Inline error banner -->
+  <Style Selector="Border.error-banner">
+    <Setter Property="Background" Value="{DynamicResource ErrorBgBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ErrorBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="10,6,4,6" />
+  </Style>
+</Styles>

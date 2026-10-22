@@ -1,0 +1,11 @@
+C:\Users\Asus\Projects\hoi4modbuilder\HoI4ModBuilder.Clausewitz\bin\Release\net10.0\HoI4ModBuilder.Clausewitz.deps.json
+C:\Users\Asus\Projects\hoi4modbuilder\HoI4ModBuilder.Clausewitz\bin\Release\net10.0\HoI4ModBuilder.Clausewitz.dll
+C:\Users\Asus\Projects\hoi4modbuilder\HoI4ModBuilder.Clausewitz\bin\Release\net10.0\HoI4ModBuilder.Clausewitz.pdb
+C:\Users\Asus\Projects\hoi4modbuilder\HoI4ModBuilder.Clausewitz\obj\Release\net10.0\HoI4ModBuilder.Clausewitz.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Asus\Projects\hoi4modbuilder\HoI4ModBuilder.Clausewitz\obj\Release\net10.0\HoI4ModBuilder.Clausewitz.AssemblyInfoInputs.cache
+C:\Users\Asus\Projects\hoi4modbuilder\HoI4ModBuilder.Clausewitz\obj\Release\net10.0\HoI4ModBuilder.Clausewitz.AssemblyInfo.cs
+C:\Users\Asus\Projects\hoi4modbuilder\HoI4ModBuilder.Clausewitz\obj\Release\net10.0\HoI4ModBuilder.Clausewitz.csproj.CoreCompileInputs.cache
+C:\Users\Asus\Projects\hoi4modbuilder\HoI4ModBuilder.Clausewitz\obj\Release\net10.0\HoI4ModBuilder.Clausewitz.dll
+C:\Users\Asus\Projects\hoi4modbuilder\HoI4ModBuilder.Clausewitz\obj\Release\net10.0\refint\HoI4ModBuilder.Clausewitz.dll
+C:\Users\Asus\Projects\hoi4modbuilder\HoI4ModBuilder.Clausewitz\obj\Release\net10.0\HoI4ModBuilder.Clausewitz.pdb
+C:\Users\Asus\Projects\hoi4modbuilder\HoI4ModBuilder.Clausewitz\obj\Release\net10.0\ref\HoI4ModBuilder.Clausewitz.dll

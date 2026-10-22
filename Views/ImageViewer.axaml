@@ -1,0 +1,50 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HoI4ModBuilder.ViewModels"
+             x:Class="HoI4ModBuilder.Views.ImageViewer"
+             x:DataType="vm:ImageTabViewModel">
+  <DockPanel>
+    <!-- Toolbar -->
+    <Border DockPanel.Dock="Top" Height="34" Padding="8,0"
+            BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,0,0,1">
+      <Grid ColumnDefinitions="Auto,*">
+        <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+          <Button Classes="flat" Padding="5" MinHeight="0" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Зменшити (Ctrl+коліщатко)">
+            <PathIcon Data="{StaticResource IconMinus}" Width="12" Height="12" />
+          </Button>
+          <TextBlock Text="{Binding ZoomText}" Width="48" TextAlignment="Center" VerticalAlignment="Center"
+                     Classes="secondary" FontSize="12" />
+          <Button Classes="flat" Padding="5" MinHeight="0" Command="{Binding ZoomInCommand}" ToolTip.Tip="Збільшити (Ctrl+коліщатко)">
+            <PathIcon Data="{StaticResource IconPlus}" Width="12" Height="12" />
+          </Button>
+          <Button Classes="flat" Padding="8,3" MinHeight="0" Margin="6,0,0,0" Content="100%"
+                  Command="{Binding ActualSizeCommand}" ToolTip.Tip="Реальний розмір" />
+          <Button Classes="flat" Padding="8,3" MinHeight="0" Content="Вмістити"
+                  Command="{Binding FitCommand}" ToolTip.Tip="Вмістити у вікно" />
+        </StackPanel>
+        <TextBlock Grid.Column="1" Text="{Binding Info}" Classes="secondary" FontSize="12"
+                   HorizontalAlignment="Right" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+
+    <Panel>
+      <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <Border Background="{StaticResource CheckerboardBrush}" Margin="24"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="1">
+          <Image x:Name="PreviewImage" Source="{Binding Image}"
+                 Width="{Binding DisplayWidth}" Height="{Binding DisplayHeight}" Stretch="Fill" />
+        </Border>
+      </ScrollViewer>
+
+      <TextBlock Text="Завантаження…" Classes="secondary" HorizontalAlignment="Center" VerticalAlignment="Center"
+                 IsVisible="{Binding IsLoading}" />
+      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6"
+                  IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <PathIcon Data="{StaticResource IconWarning}" Width="20" Height="20" Foreground="{DynamicResource ErrorBrush}" />
+        <TextBlock Text="Не вдалося відкрити зображення" HorizontalAlignment="Center" />
+        <TextBlock Text="{Binding Error}" Classes="secondary" HorizontalAlignment="Center" TextWrapping="Wrap" MaxWidth="480" />
+      </StackPanel>
+    </Panel>
+  </DockPanel>
+</UserControl>

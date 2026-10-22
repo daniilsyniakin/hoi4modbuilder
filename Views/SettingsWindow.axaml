@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:HoI4ModBuilder.ViewModels"
+        xmlns:views="using:HoI4ModBuilder.Views"
+        x:Class="HoI4ModBuilder.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="Налаштування"
+        Width="680" SizeToContent="Height" CanResize="False" CanMinimize="False" CanMaximize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <DockPanel>
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource PanelBgBrush}"
+            BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,1,0,0" Padding="16,10">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="secondary" FontSize="12" VerticalAlignment="Center"
+                   Text="Зміни застосовуються одразу." />
+        <Button Grid.Column="1" Classes="primary" Content="Готово" IsDefault="True" IsCancel="True"
+                Click="OnDoneClick" />
+      </Grid>
+    </Border>
+    <views:SettingsView Margin="20" />
+  </DockPanel>
+</Window>

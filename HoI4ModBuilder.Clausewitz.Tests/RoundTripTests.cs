@@ -1,0 +1,76 @@
+namespace HoI4ModBuilder.Clausewitz.Tests;
+
+public class RoundTripTests
+{
+    [Theory]
+    // Degenerate inputs
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\n")]
+    [InlineData("\r\n\r\n")]
+    [InlineData("\r")]
+    [InlineData("# only a comment")]
+    [InlineData("# comment\r\n")]
+    [InlineData("﻿a = b")]
+    // Ordinary script
+    [InlineData("a = b")]
+    [InlineData("a=b")]
+    [InlineData("a = b\n")]
+    [InlineData("  a\t=\tb  \r\n")]
+    [InlineData("focus_tree = {\r\n\tid = ukraine\r\n\tfocus = {\r\n\t\tid = UKR_x\r\n\t\tcost = 10\r\n\t}\r\n}\r\n")]
+    [InlineData("a = { b = { c = { d = e } } }")]
+    [InlineData("a = {}")]
+    [InlineData("a = { }")]
+    [InlineData("{}")]
+    [InlineData("{ { } { } }")]
+    [InlineData("tags = { GER ENG \"FRA\" }")]
+    [InlineData("color = rgb { 255 0 0 }")]
+    [InlineData("color = hsv{0.1 0.2 0.3}")]
+    [InlineData("key { a = 1 }")]
+    [InlineData("a = b\n{ c }")]
+    // Operators
+    [InlineData("a < 1 b > 2 c <= 3 d >= 4 e != 5 f == 6 g ?= 7")]
+    [InlineData("a<1b>2")]
+    [InlineData("a!=b c?=d")]
+    [InlineData("a = !b c = ?d")]
+    // Words that look odd
+    [InlineData("date = 1936.1.1.12")]
+    [InlineData("value = -0.25")]
+    [InlineData("t = var:[?global.x]")]
+    [InlineData("x = FROM.FROM.owner")]
+    [InlineData("@cost = 10\na = @cost")]
+    [InlineData("a = @[ cost * 2 ]")]
+    [InlineData("a = @[cost*2]b")]
+    // Strings
+    [InlineData("a = \"\"")]
+    [InlineData("a = \"with # hash\"")]
+    [InlineData("a = \"esc \\\" quote\"")]
+    [InlineData("a = \"back\\\\\"")]
+    [InlineData("a = \"multi\nline\"")]
+    [InlineData("\"quoted key\" = value")]
+    [InlineData("name = \"Велика Україна\" # коментар")]
+    // Comments everywhere
+    [InlineData("a # c1\n= # c2\nb # c3")]
+    [InlineData("a = { # open\n\tb = c # inner\n} # close")]
+    [InlineData("a = b#tight")]
+    // Mixed line endings, no trailing newline
+    [InlineData("a = b\r\nc = d\ne = f\rg = h")]
+    // Broken input must still round-trip
+    [InlineData("a =")]
+    [InlineData("a = ")]
+    [InlineData("a = }")]
+    [InlineData("}")]
+    [InlineData("} } a = b }")]
+    [InlineData("= b")]
+    [InlineData("= = =")]
+    [InlineData("a = { b = c")]
+    [InlineData("a = { b = { c")]
+    [InlineData("a = \"unterminated")]
+    [InlineData("a = \"ends with backslash\\")]
+    [InlineData("a = @[ 1 + 2")]
+    [InlineData("{{{{")]
+    [InlineData("a = = b")]
+    [InlineData("a = rgb")]
+    [InlineData("a = rgb {")]
+    public void DumpIsIdenticalToInput(string text) => TreeAssert.ParseLossless(text);
+}

@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:insp="using:HoI4ModBuilder.ViewModels.Entities.Inspector"
+             x:Class="HoI4ModBuilder.Views.Entities.CommandPicker"
+             x:DataType="insp:CommandPickerViewModel">
+  <DockPanel Width="520" Height="440">
+    <TextBox x:Name="SearchBox" DockPanel.Dock="Top" Text="{Binding Search}" PlaceholderText="Пошук" Margin="0,0,0,6" />
+    <ListBox DockPanel.Dock="Left" Width="150" Classes="dense" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}"
+             Background="Transparent" Margin="0,0,6,0" />
+    <ListBox x:Name="List" Classes="dense" ItemsSource="{Binding Shown}" Background="Transparent">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="insp:CommandChoice">
+          <StackPanel Spacing="1" Margin="0,2" Background="Transparent">
+            <TextBlock Text="{Binding Name}" FontFamily="{StaticResource EditorFont}" FontSize="12" />
+            <TextBlock Text="{Binding Description}" Classes="secondary" FontSize="11" TextWrapping="Wrap" MaxLines="2"
+                       TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </DockPanel>
+</UserControl>

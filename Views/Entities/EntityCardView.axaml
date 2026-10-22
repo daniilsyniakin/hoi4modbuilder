@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ent="using:HoI4ModBuilder.ViewModels.Entities"
+             xmlns:views="using:HoI4ModBuilder.Views.Entities"
+             x:Class="HoI4ModBuilder.Views.Entities.EntityCardView"
+             x:DataType="ent:EntityCardTabViewModel">
+  <Panel>
+    <!-- The card: what the game shows (picture, name, description) above every property -->
+    <Border MaxWidth="760" Margin="24,20" HorizontalAlignment="Stretch"
+            Background="{DynamicResource PanelBgBrush}" CornerRadius="8"
+            BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="1"
+            IsVisible="{Binding Panel, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <views:PropertyPanel DataContext="{Binding Panel}" />
+    </Border>
+
+    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6"
+                IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <PathIcon Data="{StaticResource IconWarning}" Width="20" Height="20" Foreground="{DynamicResource ErrorBrush}" />
+      <TextBlock Text="{Binding Error}" Classes="secondary" TextWrapping="Wrap" MaxWidth="480" TextAlignment="Center" />
+    </StackPanel>
+  </Panel>
+</UserControl>

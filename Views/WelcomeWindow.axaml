@@ -1,0 +1,251 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:HoI4ModBuilder.ViewModels"
+        xmlns:views="using:HoI4ModBuilder.Views"
+        mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="580"
+        x:Class="HoI4ModBuilder.Views.WelcomeWindow"
+        x:DataType="vm:WelcomeViewModel"
+        Title="Ласкаво просимо до HoI4 Mod Builder"
+        Width="820" Height="580" MinWidth="680" MinHeight="460"
+        WindowStartupLocation="CenterScreen">
+
+  <Grid ColumnDefinitions="220,*">
+
+    <!-- Sidebar -->
+    <Border Background="{DynamicResource PanelBgBrush}"
+            BorderBrush="{DynamicResource SeparatorBrush}"
+            BorderThickness="0,0,1,0">
+      <DockPanel Margin="12,16">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="6,0,0,20">
+          <Border Width="36" Height="36" CornerRadius="8">
+            <Border.Background>
+              <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Offset="0" Color="#E0573A" />
+                <GradientStop Offset="1" Color="#8C2F39" />
+              </LinearGradientBrush>
+            </Border.Background>
+            <TextBlock Text="H4" FontWeight="Bold" FontSize="14" Foreground="White"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="HoI4 Mod Builder" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding AppVersion}" Classes="secondary" FontSize="12" />
+          </StackPanel>
+        </StackPanel>
+
+        <ListBox Classes="nav" SelectedIndex="{Binding NavIndex, Mode=TwoWay}">
+          <ListBoxItem>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" />
+              <TextBlock Text="Моди" />
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <PathIcon Data="{StaticResource IconSliders}" Width="14" Height="14" />
+              <TextBlock Text="Налаштування" />
+            </StackPanel>
+          </ListBoxItem>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <Panel Grid.Column="1">
+
+      <!-- Mods: recent list -->
+      <DockPanel Margin="24,20" IsVisible="{Binding ShowRecentList}">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,14">
+          <TextBox Text="{Binding SearchText}" PlaceholderText="Пошук модів">
+            <TextBox.InnerLeftContent>
+              <PathIcon Data="{StaticResource IconSearch}" Width="13" Height="13" Margin="8,0,0,0"
+                        Foreground="{DynamicResource TextSecondaryBrush}" />
+            </TextBox.InnerLeftContent>
+          </TextBox>
+          <Button Grid.Column="1" Classes="primary" Margin="10,0,0,0" Content="Новий мод"
+                  Command="{Binding StartNewModCommand}" />
+          <Button Grid.Column="2" Classes="secondary" Margin="8,0,0,0" Content="Відкрити"
+                  Command="{Binding OpenModCommand}" />
+        </Grid>
+
+        <Border DockPanel.Dock="Top" Classes="error-banner" Margin="0,0,0,12"
+                IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <PathIcon Data="{StaticResource IconWarning}" Width="14" Height="14"
+                      Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Top" Margin="0,2,8,0" />
+            <TextBlock Grid.Column="1" Text="{Binding ErrorMessage}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            <Button Grid.Column="2" Classes="flat" Padding="4" MinHeight="0" VerticalAlignment="Top"
+                    Command="{Binding DismissErrorCommand}" ToolTip.Tip="Закрити">
+              <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" />
+            </Button>
+          </Grid>
+        </Border>
+
+        <Panel>
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding FilteredMods}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:RecentModItemViewModel">
+                  <Button Classes="recent flat" Command="{Binding OpenCommand}">
+                    <Button.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Відкрити" Command="{Binding OpenCommand}" />
+                        <MenuItem Header="Показати в провіднику" Command="{Binding RevealCommand}" />
+                        <Separator />
+                        <MenuItem Header="Прибрати зі списку" Command="{Binding RemoveCommand}" />
+                      </ContextMenu>
+                    </Button.ContextMenu>
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                      <Border Width="32" Height="32" CornerRadius="6" Background="{Binding AvatarBrush}">
+                        <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="SemiBold" FontSize="12"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center" Spacing="1">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding DisplayPath}" Classes="secondary" Classes.missing="{Binding IsMissing}"
+                                   FontSize="12" TextTrimming="PrefixCharacterEllipsis" />
+                      </StackPanel>
+                      <Button Grid.Column="2" Classes="flat more" Padding="5" MinHeight="0"
+                              VerticalAlignment="Center" ToolTip.Tip="Дії">
+                        <PathIcon Data="{StaticResource IconMore}" Width="14" Height="14" />
+                        <Button.Flyout>
+                          <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            <MenuItem Header="Показати в провіднику" Command="{Binding RevealCommand}" />
+                            <MenuItem Header="Прибрати зі списку" Command="{Binding RemoveCommand}" />
+                          </MenuFlyout>
+                        </Button.Flyout>
+                      </Button>
+                    </Grid>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+          <TextBlock Text="Нічого не знайдено" Classes="secondary" HorizontalAlignment="Center" Margin="0,40,0,0"
+                     IsVisible="{Binding NoSearchResults}" />
+        </Panel>
+      </DockPanel>
+
+      <!-- Mods: empty state (first launch) -->
+      <StackPanel IsVisible="{Binding ShowEmptyState}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                  Spacing="6" MaxWidth="420">
+        <TextBlock Text="Ласкаво просимо до HoI4 Mod Builder" Classes="h1" HorizontalAlignment="Center" />
+        <TextBlock Classes="secondary" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,24"
+                   Text="Створіть новий мод для Hearts of Iron IV з нуля або відкрийте вже наявний." />
+
+        <Border Classes="error-banner" Margin="0,0,0,12"
+                IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
+        </Border>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="32">
+          <Button Classes="flat" Padding="12" Command="{Binding StartNewModCommand}">
+            <StackPanel Spacing="8">
+              <Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource AccentBrush}"
+                      HorizontalAlignment="Center">
+                <PathIcon Data="{StaticResource IconPlus}" Width="18" Height="18" Foreground="White" />
+              </Border>
+              <TextBlock Text="Новий мод" HorizontalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="flat" Padding="12" Command="{Binding OpenModCommand}">
+            <StackPanel Spacing="8">
+              <Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource HoverBrush}"
+                      HorizontalAlignment="Center">
+                <PathIcon Data="{StaticResource IconFolder}" Width="18" Height="18" />
+              </Border>
+              <TextBlock Text="Відкрити" HorizontalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </StackPanel>
+
+      <!-- New mod form -->
+      <Panel IsVisible="{Binding IsNewModPage}">
+      <DockPanel Margin="24,20" DataContext="{Binding NewModForm}" x:DataType="vm:NewModViewModel">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="-6,0,0,18">
+          <Button Classes="flat" Padding="6" MinHeight="0" Command="{Binding CancelCommand}" ToolTip.Tip="Назад">
+            <PathIcon Data="{StaticResource IconBack}" Width="14" Height="14" />
+          </Button>
+          <TextBlock Text="Новий мод" Classes="h1" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,1,0,0"
+                Padding="0,14,0,0" Margin="0,12,0,0">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Classes="secondary" Content="Скасувати" Command="{Binding CancelCommand}" />
+            <Button Classes="primary" Content="Створити" Command="{Binding CreateCommand}" IsDefault="True" />
+          </StackPanel>
+        </Border>
+
+        <ScrollViewer>
+          <Grid Classes="form" ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                Margin="0,0,8,0">
+            <Grid.Styles>
+              <Style Selector="Grid.form > :is(Control)">
+                <Setter Property="Margin" Value="0,0,0,10" />
+              </Style>
+            </Grid.Styles>
+
+            <TextBlock Grid.Row="0" Classes="label" Text="Назва" />
+            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Name}" PlaceholderText="Наприклад, Kaiserreich Lite" />
+
+            <TextBlock Grid.Row="1" Classes="label" Text="Папка" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding FolderName}" />
+
+            <TextBlock Grid.Row="2" Classes="label" Text="Розташування" />
+            <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto">
+              <TextBox Text="{Binding Location}" Margin="0" />
+              <Button Grid.Column="1" Classes="secondary" Padding="8,5" Margin="6,0,0,0"
+                      Command="{Binding BrowseLocationCommand}" ToolTip.Tip="Огляд…">
+                <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" />
+              </Button>
+            </Grid>
+
+            <TextBlock Grid.Row="3" Grid.Column="1" Classes="secondary" FontSize="12" Margin="0,-4,0,14"
+                       TextWrapping="Wrap" Text="{Binding TargetPath, StringFormat='Мод буде створено в {0}'}" />
+
+            <TextBlock Grid.Row="4" Classes="label" Text="Версія моду" />
+            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding Version}" HorizontalAlignment="Left" Width="160" />
+
+            <TextBlock Grid.Row="5" Classes="label" Text="Версія гри" />
+            <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Spacing="10">
+              <TextBox Text="{Binding SupportedVersion}" Width="160" Margin="0" />
+              <TextBlock Classes="secondary" FontSize="12" VerticalAlignment="Center"
+                         Text="«*» — будь-який патч, напр. 1.16.*" />
+            </StackPanel>
+
+            <TextBlock Grid.Row="6" Classes="label" Text="Теги" VerticalAlignment="Top" Margin="0,4,0,0" />
+            <ItemsControl Grid.Row="6" Grid.Column="1" ItemsSource="{Binding Tags}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TagOption">
+                  <ToggleButton Classes="chip" Content="{Binding Name}" IsChecked="{Binding IsSelected}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border Grid.Row="7" Grid.Column="1" Classes="error-banner"
+                    IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
+            </Border>
+          </Grid>
+        </ScrollViewer>
+      </DockPanel>
+      </Panel>
+
+      <!-- Settings -->
+      <Panel IsVisible="{Binding IsSettingsPage}">
+        <StackPanel Margin="24,20">
+          <TextBlock Text="Налаштування" Classes="h1" Margin="0,0,0,20" />
+          <views:SettingsView DataContext="{Binding Settings}" />
+        </StackPanel>
+      </Panel>
+    </Panel>
+  </Grid>
+</Window>

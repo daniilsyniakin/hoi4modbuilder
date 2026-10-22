@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>HoI4ModBuilder</AssemblyName>
+    <RootNamespace>HoI4ModBuilder</RootNamespace>
+    <Version>0.1.0</Version>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <!-- The app project sits in the repository root, so keep its globs out of the sibling projects. -->
+  <ItemGroup>
+    <Compile Remove="HoI4ModBuilder.*/**" />
+    <EmbeddedResource Remove="HoI4ModBuilder.*/**" />
+    <None Remove="HoI4ModBuilder.*/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="HoI4ModBuilder.Clausewitz\HoI4ModBuilder.Clausewitz.csproj" />
+    <ProjectReference Include="HoI4ModBuilder.Game\HoI4ModBuilder.Game.csproj" />
+  </ItemGroup>
+
+</Project>

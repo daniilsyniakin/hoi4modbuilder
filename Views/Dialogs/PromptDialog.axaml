@@ -1,0 +1,15 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="HoI4ModBuilder.Views.Dialogs.PromptDialog"
+        Width="420" SizeToContent="Height" CanResize="False" CanMinimize="False" CanMaximize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <StackPanel Margin="20,16,20,16" Spacing="8">
+    <TextBlock x:Name="LabelText" Classes="secondary" />
+    <TextBox x:Name="Input" />
+    <TextBlock x:Name="ErrorText" Classes="missing" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+      <Button x:Name="CancelButton" Classes="secondary" Content="Скасувати" IsCancel="True" />
+      <Button x:Name="ConfirmButton" Classes="primary" IsDefault="True" />
+    </StackPanel>
+  </StackPanel>
+</Window>

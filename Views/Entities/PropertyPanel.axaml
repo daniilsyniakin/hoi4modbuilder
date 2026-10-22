@@ -1,0 +1,355 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ent="using:HoI4ModBuilder.ViewModels.Entities"
+             xmlns:insp="using:HoI4ModBuilder.ViewModels.Entities.Inspector"
+             xmlns:views="using:HoI4ModBuilder.Views.Entities"
+             xmlns:glob="using:System.Globalization"
+             xmlns:val="using:HoI4ModBuilder.Game.Validation"
+             xmlns:conv="using:HoI4ModBuilder.Views.Converters"
+             x:Class="HoI4ModBuilder.Views.Entities.PropertyPanel"
+             x:DataType="ent:PropertyPanelViewModel">
+  <UserControl.Styles>
+    <Style Selector="TextBlock.label">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="TextBlock.key">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontFamily" Value="{StaticResource EditorFont}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <!-- Not set in the script: dimmed, filling it in adds it -->
+    <Style Selector="Grid.row.missing TextBlock.label">
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="FontStyle" Value="Italic" />
+    </Style>
+    <Style Selector="Grid.row">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="MinHeight" Value="28" />
+    </Style>
+    <!-- Problems found by the mod check: a coloured bar on the left and the message under the row -->
+    <Style Selector="Grid.row.error, Grid.row.warning">
+      <Setter Property="Margin" Value="-8,1,0,1" />
+    </Style>
+    <Style Selector="Grid.row.error">
+      <Setter Property="Background" Value="#26F75464" />
+    </Style>
+    <Style Selector="Grid.row.warning">
+      <Setter Property="Background" Value="#22E2B341" />
+    </Style>
+    <Style Selector="Grid.row.error > StackPanel:nth-child(1), Grid.row.warning > StackPanel:nth-child(1)">
+      <Setter Property="Margin" Value="8,0,8,0" />
+    </Style>
+    <Style Selector="TextBlock.problem">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Margin" Value="8,0,4,4" />
+    </Style>
+    <Style Selector="Grid.row.error TextBlock.problem">
+      <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+    </Style>
+    <Style Selector="Grid.row.warning TextBlock.problem">
+      <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+    </Style>
+    <Style Selector="Button.remove">
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="Padding" Value="5" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="2,0,0,0" />
+    </Style>
+    <Style Selector="Grid.row:pointerover Button.remove, Button.remove:focus">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <!-- Scripts write numbers with a dot, whatever the system's culture says. -->
+    <Style Selector="NumericUpDown.value">
+      <Setter Property="NumberFormat" Value="{x:Static glob:NumberFormatInfo.InvariantInfo}" />
+    </Style>
+    <Style Selector="AutoCompleteBox.value, AutoCompleteBox.add, NumericUpDown.value">
+      <Setter Property="FontFamily" Value="{StaticResource EditorFont}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="MinHeight" Value="26" />
+    </Style>
+    <Style Selector="AutoCompleteBox">
+      <Setter Property="MaxDropDownHeight" Value="280" />
+    </Style>
+    <Style Selector="AutoCompleteBox.add">
+      <Setter Property="Margin" Value="0,4,0,2" />
+    </Style>
+    <Style Selector="Border.chip">
+      <Setter Property="Background" Value="{DynamicResource PressedBrush}" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="8,1,2,1" />
+      <Setter Property="Margin" Value="0,2,4,2" />
+    </Style>
+    <Style Selector="ToggleButton.expander">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="3" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Margin" Value="-4,0,2,0" />
+    </Style>
+    <Style Selector="ToggleButton.expander PathIcon">
+      <Setter Property="RenderTransform" Value="rotate(-90deg)" />
+    </Style>
+    <Style Selector="ToggleButton.expander:checked PathIcon">
+      <Setter Property="RenderTransform" Value="none" />
+    </Style>
+    <Style Selector="ToggleButton.expander:checked /template/ ContentPresenter, ToggleButton.expander:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <!-- Texts edited in place: look like text until hovered or focused -->
+    <Style Selector="TextBox.inline">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Padding" Value="4,2" />
+      <Setter Property="Margin" Value="-5,0,0,0" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="TextBox.inline:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+    </Style>
+    <Style Selector="TextBox.inline:focus /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{DynamicResource FieldBgBrush}" />
+    </Style>
+    <Style Selector="TextBox.inline /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="TextBox.description">
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="Button.picture">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.picture Border.pencil">
+      <Setter Property="Opacity" Value="0.85" />
+    </Style>
+    <Style Selector="Button.picture:pointerover Border.pencil">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+  </UserControl.Styles>
+
+  <UserControl.DataTemplates>
+    <!-- key = value -->
+    <DataTemplate DataType="insp:ScalarNode">
+      <Grid Classes="row" Classes.missing="{Binding IsMissing}" Classes.error="{Binding HasError}" Classes.warning="{Binding HasWarning}"
+            ColumnDefinitions="128,*,Auto" RowDefinitions="Auto,Auto,Auto">
+        <StackPanel VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="{Binding Documentation, FallbackValue={x:Null}, TargetNullValue={x:Null}}">
+          <TextBlock Text="{Binding Label}" Classes="label" />
+          <TextBlock Text="{Binding Key}" Classes="key" IsVisible="{Binding ShowKey}" />
+        </StackPanel>
+        <Panel Grid.Column="1" VerticalAlignment="Center">
+          <views:SuggestionBox Classes="value" IsVisible="{Binding IsText}" Text="{Binding Text, Mode=TwoWay}"
+                           ItemsSource="{Binding Suggestions}" PlaceholderText="{Binding Placeholder}"
+                           />
+          <NumericUpDown Classes="value" IsVisible="{Binding IsNumber}" Value="{Binding Number}"
+                         FormatString="0.#####" Increment="1" PlaceholderText="{Binding Placeholder}" />
+          <CheckBox IsVisible="{Binding IsBool}" IsChecked="{Binding IsChecked}" MinHeight="0" />
+          <!-- Picked on the canvas: click, then click the target there -->
+          <Button Classes="pick" IsVisible="{Binding IsPickable}" Command="{Binding PickValueCommand}"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="8,4" MinHeight="26">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="{Binding PickText}" FontFamily="{StaticResource EditorFont}" FontSize="12"
+                         TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                         Classes.secondary="{Binding IsMissing}" />
+              <PathIcon Grid.Column="1" Data="{StaticResource IconTarget}" Width="12" Height="12" Margin="6,0,0,0"
+                        Foreground="{DynamicResource AccentHoverBrush}" />
+            </Grid>
+          </Button>
+          <SelectableTextBlock IsVisible="{Binding IsReadOnly}" Text="{Binding Text}" FontFamily="{StaticResource EditorFont}"
+                               FontSize="12" TextWrapping="Wrap" />
+        </Panel>
+        <Button Grid.Column="2" Classes="flat remove" Command="{Binding RemoveCommand}" IsVisible="{Binding IsPresent}"
+                ToolTip.Tip="Видалити властивість">
+          <PathIcon Data="{StaticResource IconClose}" Width="8" Height="8" />
+        </Button>
+        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Hint}" Classes="secondary" FontSize="11" TextWrapping="Wrap"
+                   Margin="2,2,0,2" IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <TextBlock Grid.Row="2" Grid.ColumnSpan="3" Classes="problem" Text="{Binding Problem.Message, FallbackValue=''}"
+                   IsVisible="{Binding Problem, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </Grid>
+    </DataTemplate>
+
+    <!-- key = { … } -->
+    <DataTemplate DataType="insp:BlockNode">
+      <StackPanel>
+        <Grid Classes="row" Classes.missing="{Binding IsMissing}" Classes.error="{Binding HasError}" Classes.warning="{Binding HasWarning}"
+              ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+          <ToggleButton Classes="expander" IsChecked="{Binding IsExpanded}" IsVisible="{Binding IsPresent}">
+            <PathIcon Data="{StaticResource IconChevronDown}" Width="9" Height="9" />
+          </ToggleButton>
+          <StackPanel Grid.Column="1" VerticalAlignment="Center" ToolTip.Tip="{Binding Documentation, FallbackValue={x:Null}, TargetNullValue={x:Null}}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="{Binding Label}" Classes="label" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Key}" Classes="key" VerticalAlignment="Center" IsVisible="{Binding ShowKey}" />
+            </StackPanel>
+            <TextBlock Text="{Binding Summary}" Classes="secondary" FontSize="11" TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding !IsExpanded}" />
+          </StackPanel>
+          <Button Grid.Column="2" Classes="flat" Padding="6,2" MinHeight="0" VerticalAlignment="Center"
+                  Command="{Binding CreateCommand}" IsVisible="{Binding IsMissing}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <PathIcon Data="{StaticResource IconPlus}" Width="9" Height="9" />
+              <TextBlock Text="Створити" FontSize="12" />
+            </StackPanel>
+          </Button>
+          <Button Grid.Column="2" Classes="flat remove" Command="{Binding RemoveCommand}" IsVisible="{Binding IsPresent}"
+                  ToolTip.Tip="Видалити блок">
+            <PathIcon Data="{StaticResource IconClose}" Width="8" Height="8" />
+          </Button>
+          <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Classes="problem" Text="{Binding Problem.Message, FallbackValue=''}"
+                     IsVisible="{Binding Problem, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </Grid>
+        <Border IsVisible="{Binding IsExpanded}" Margin="4,0,0,6" Padding="10,0,0,0"
+                BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="1,0,0,0">
+          <StackPanel>
+            <ItemsControl ItemsSource="{Binding Children}" />
+            <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding IsList}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="insp:ListItemViewModel">
+                  <Border Classes="chip" ToolTip.Tip="{Binding Hint}">
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                      <TextBlock Text="{Binding Text}" FontFamily="{StaticResource EditorFont}" FontSize="12" VerticalAlignment="Center" />
+                      <Button Classes="flat" Padding="4" MinHeight="0" Command="{Binding RemoveCommand}" ToolTip.Tip="Прибрати">
+                        <PathIcon Data="{StaticResource IconClose}" Width="7" Height="7" />
+                      </Button>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <views:SuggestionBox Classes="add add-item" IsVisible="{Binding IsList}" Text="{Binding NewItem, Mode=TwoWay}"
+                             ItemsSource="{Binding ItemSuggestions}" PlaceholderText="+ додати елемент"
+                             />
+<Button Classes="flat add-command" IsVisible="{Binding IsScript}" HorizontalAlignment="Left"
+                    Padding="6,3" MinHeight="0" Margin="0,4,0,2">
+              <StackPanel Orientation="Horizontal" Spacing="5">
+                <PathIcon Data="{StaticResource IconPlus}" Width="9" Height="9" />
+                <TextBlock Text="{Binding AddCommandLabel}" FontSize="12" />
+              </StackPanel>
+              <Button.Flyout>
+                <Flyout Placement="LeftEdgeAlignedTop">
+                  <views:CommandPicker DataContext="{Binding Picker}" />
+                </Flyout>
+              </Button.Flyout>
+            </Button>
+            <views:SuggestionBox Classes="add add-key" Text="{Binding NewKey, Mode=TwoWay}"
+                             ItemsSource="{Binding KeySuggestions}" PlaceholderText="+ додати властивість">
+              <views:SuggestionBox.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                  <Binding Path="!IsList" />
+                  <Binding Path="!IsScript" />
+                </MultiBinding>
+              </views:SuggestionBox.IsVisible>
+            </views:SuggestionBox>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.DataTemplates>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="14,14,10,14" Spacing="10">
+      <Grid ColumnDefinitions="Auto,*">
+        <!-- Click the picture to choose another sprite -->
+        <Button x:Name="PictureButton" Classes="picture" Width="88" Height="88" Margin="0,0,12,0" IsVisible="{Binding CanEditPicture}">
+          <Panel>
+            <Image Source="{Binding Picture}" Stretch="Uniform" />
+            <PathIcon Data="{StaticResource IconImage}" Width="28" Height="28" Foreground="{DynamicResource TextSecondaryBrush}"
+                      IsVisible="{Binding Picture, Converter={x:Static ObjectConverters.IsNull}}" />
+            <Border Classes="pencil" Width="22" Height="22" CornerRadius="11" Background="{DynamicResource AccentBrush}"
+                    HorizontalAlignment="Right" VerticalAlignment="Bottom">
+              <PathIcon Data="{StaticResource IconPencil}" Width="11" Height="11" Foreground="White" />
+            </Border>
+          </Panel>
+          <Button.Flyout>
+            <Flyout Placement="LeftEdgeAlignedTop">
+              <views:SpritePicker x:Name="Picker" />
+            </Flyout>
+          </Button.Flyout>
+        </Button>
+        <Border Width="88" Height="88" Margin="0,0,12,0" IsVisible="{Binding ShowStaticPicture}">
+          <Image Source="{Binding Picture}" Stretch="Uniform" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+          <!-- The name in the chosen language, edited in place -->
+          <TextBox Classes="inline" DataContext="{Binding TitleText}" x:DataType="ent:LocalisedTextViewModel"
+                   Text="{Binding Text}" PlaceholderText="{Binding Placeholder}"
+                   IsVisible="{Binding $parent[UserControl].((ent:PropertyPanelViewModel)DataContext).TitleText, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}"
+                   FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <SelectableTextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"
+                               IsVisible="{Binding TitleText, Converter={x:Static ObjectConverters.IsNull}}" />
+          <SelectableTextBlock Text="{Binding Subtitle}" Classes="key" FontSize="11" TextWrapping="Wrap" />
+          <ItemsControl ItemsSource="{Binding Problems}" Margin="0,4,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="val:Problem">
+                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,1">
+                  <PathIcon Width="11" Height="11" VerticalAlignment="Top" Margin="0,2,0,0"
+                            Data="{Binding Severity, Converter={x:Static conv:ProblemIcons.Geometry}}"
+                            Foreground="{Binding Severity, Converter={x:Static conv:ProblemIcons.Brush}}" />
+                  <TextBlock Text="{Binding Message}" FontSize="11" TextWrapping="Wrap" MaxWidth="230"
+                             Foreground="{Binding Severity, Converter={x:Static conv:ProblemIcons.Brush}}" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Grid>
+
+      <TextBox Classes="inline description" DataContext="{Binding DescriptionText}" x:DataType="ent:LocalisedTextViewModel"
+               Text="{Binding Text}" PlaceholderText="{Binding Placeholder}" AcceptsReturn="True" TextWrapping="Wrap"
+               IsVisible="{Binding $parent[UserControl].((ent:PropertyPanelViewModel)DataContext).DescriptionText, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}"
+               FontSize="12" />
+      <SelectableTextBlock Text="{Binding Description}" TextWrapping="Wrap" FontSize="12"
+                           Foreground="{DynamicResource TextSecondaryBrush}">
+        <SelectableTextBlock.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="Description" Converter="{x:Static StringConverters.IsNotNullOrEmpty}" />
+            <Binding Path="DescriptionText" Converter="{x:Static ObjectConverters.IsNull}" />
+          </MultiBinding>
+        </SelectableTextBlock.IsVisible>
+      </SelectableTextBlock>
+
+      <Button Classes="flat" Padding="8,4" MinHeight="0" HorizontalAlignment="Left"
+              Command="{Binding OpenInCodeCommand}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <PathIcon Data="{StaticResource IconScript}" Width="12" Height="12" />
+          <TextBlock Text="Відкрити в коді" />
+        </StackPanel>
+      </Button>
+
+      <Border Height="1" Background="{DynamicResource SeparatorBrush}" />
+
+      <StackPanel>
+        <ItemsControl ItemsSource="{Binding Root.Children, FallbackValue={x:Null}}" />
+        <Panel DataContext="{Binding Root}" x:DataType="insp:BlockNode">
+          <!-- Scripted effects and triggers are script themselves: their root adds commands -->
+          <Button Classes="flat add-command" IsVisible="{Binding IsScript, FallbackValue=False}" HorizontalAlignment="Left"
+                  Padding="6,3" MinHeight="0" Margin="0,4,0,2">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <PathIcon Data="{StaticResource IconPlus}" Width="9" Height="9" />
+              <TextBlock Text="{Binding AddCommandLabel}" FontSize="12" />
+            </StackPanel>
+            <Button.Flyout>
+              <Flyout Placement="LeftEdgeAlignedTop">
+                <views:CommandPicker DataContext="{Binding Picker}" />
+              </Flyout>
+            </Button.Flyout>
+          </Button>
+          <views:SuggestionBox Classes="add add-key" IsVisible="{Binding !IsScript, FallbackValue=False}"
+                               Text="{Binding NewKey, Mode=TwoWay}" ItemsSource="{Binding KeySuggestions}" PlaceholderText="+ додати властивість" />
+        </Panel>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ent="using:HoI4ModBuilder.ViewModels.Entities"
+             x:Class="HoI4ModBuilder.Views.Entities.SpritePicker"
+             x:DataType="ent:SpritePickerViewModel">
+  <DockPanel Width="380" Height="480">
+    <TextBox x:Name="SearchBox" DockPanel.Dock="Top" Text="{Binding Search}" PlaceholderText="Пошук"
+             Margin="0,0,0,6" />
+    <TextBlock DockPanel.Dock="Bottom" Text="{Binding Summary}" Classes="secondary" FontSize="11" Margin="2,6,0,0" />
+    <ListBox x:Name="List" ItemsSource="{Binding Shown}" Background="Transparent">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="ent:SpriteChoiceViewModel">
+          <Grid ColumnDefinitions="56,*" Height="52" Background="Transparent" ToolTip.Tip="{Binding Name}">
+            <Image Source="{Binding Image}" Width="48" Height="48" Stretch="Uniform"
+                   RenderOptions.BitmapInterpolationMode="HighQuality" />
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+              <TextBlock Text="{Binding ShortName}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding Name}" FontFamily="{StaticResource EditorFont}" FontSize="10"
+                         Classes="secondary" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </DockPanel>
+</UserControl>

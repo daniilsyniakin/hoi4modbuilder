@@ -1,0 +1,466 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:HoI4ModBuilder.ViewModels"
+        xmlns:conv="using:HoI4ModBuilder.Views.Converters"
+        xmlns:ae="using:AvaloniaEdit"
+        xmlns:views="using:HoI4ModBuilder.Views"
+        xmlns:ent="using:HoI4ModBuilder.ViewModels.Entities"
+        xmlns:entv="using:HoI4ModBuilder.Views.Entities"
+        x:Class="HoI4ModBuilder.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="{Binding Title}"
+        Width="1280" Height="800" MinWidth="720" MinHeight="420"
+        WindowStartupLocation="CenterScreen">
+
+  <!-- Shortcuts live here rather than in MenuItem.HotKey: nested menu items only register
+       their hot keys once the submenu has been opened. Keep InputGesture in the menu in sync. -->
+  <Window.Resources>
+    <ControlTheme x:Key="CreateMenuItem" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}"
+                  x:DataType="vm:CreateOptionViewModel">
+      <Setter Property="Header" Value="{Binding Title}" />
+      <Setter Property="Command" Value="{Binding Command}" />
+      <Setter Property="CommandParameter" Value="{Binding Kind}" />
+      <Setter Property="Icon">
+        <Template>
+          <PathIcon Width="12" Height="12"
+                    Data="{Binding Kind, Converter={x:Static conv:ContentIcons.Geometry}}"
+                    Foreground="{Binding Kind, Converter={x:Static conv:ContentIcons.Brush}}" />
+        </Template>
+      </Setter>
+    </ControlTheme>
+  </Window.Resources>
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+Shift+N" Command="{Binding NewModCommand}" />
+    <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenModCommand}" />
+    <KeyBinding Gesture="Ctrl+F4" Command="{Binding CloseActiveTabCommand}" />
+    <KeyBinding Gesture="Ctrl+Alt+S" Command="{Binding OpenSettingsCommand}" />
+    <KeyBinding Gesture="Alt+D1" Command="{Binding ToggleProjectPanelCommand}" />
+    <KeyBinding Gesture="Alt+D6" Command="{Binding ToggleProblemsPanelCommand}" />
+    <!-- Text editors and text boxes handle these first, with their own undo. -->
+    <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
+    <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
+    <!-- Everything is saved automatically; Ctrl+S just skips the short delay. -->
+    <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveAllCommand}" />
+  </Window.KeyBindings>
+
+  <DockPanel>
+
+    <!-- Menu bar -->
+    <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,0,0,1">
+      <Menu Classes="main">
+        <MenuItem Header="_Файл">
+          <MenuItem Header="_Новий мод…" Command="{Binding NewModCommand}"
+                    InputGesture="Ctrl+Shift+N">
+            <MenuItem.Icon>
+              <PathIcon Data="{StaticResource IconPlus}" Width="12" Height="12" />
+            </MenuItem.Icon>
+          </MenuItem>
+          <MenuItem Header="_Відкрити мод…" Command="{Binding OpenModCommand}"
+                    InputGesture="Ctrl+O">
+            <MenuItem.Icon>
+              <PathIcon Data="{StaticResource IconFolder}" Width="12" Height="12" />
+            </MenuItem.Icon>
+          </MenuItem>
+          <MenuItem Header="_Закрити мод" Command="{Binding CloseModCommand}" />
+          <Separator />
+          <MenuItem Header="Закрити вкладку" Command="{Binding CloseActiveTabCommand}"
+                    InputGesture="Ctrl+F4" />
+          <Separator />
+          <MenuItem Header="_Налаштування…" Command="{Binding OpenSettingsCommand}"
+                    InputGesture="Ctrl+Alt+S">
+            <MenuItem.Icon>
+              <PathIcon Data="{StaticResource IconSliders}" Width="12" Height="12" />
+            </MenuItem.Icon>
+          </MenuItem>
+          <Separator />
+          <MenuItem Header="Ви_хід" Command="{Binding ExitCommand}" />
+        </MenuItem>
+        <MenuItem Header="_Правка">
+          <MenuItem Header="{Binding UndoHeader}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
+          <MenuItem Header="{Binding RedoHeader}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Shift+Z" />
+        </MenuItem>
+        <MenuItem Header="_Вигляд">
+          <MenuItem Header="Панель проєкту" ToggleType="CheckBox"
+                    IsChecked="{Binding IsProjectPanelVisible, Mode=OneWay}"
+                    Command="{Binding ToggleProjectPanelCommand}"
+                    InputGesture="Alt+1" />
+          <MenuItem Header="Проблеми" ToggleType="CheckBox"
+                    IsChecked="{Binding IsProblemsPanelVisible, Mode=OneWay}"
+                    Command="{Binding ToggleProblemsPanelCommand}"
+                    InputGesture="Alt+6" />
+        </MenuItem>
+      </Menu>
+    </Border>
+
+    <!-- Status bar -->
+    <Border DockPanel.Dock="Bottom" Classes="status-bar" Height="26" Padding="12,0"
+            Background="{DynamicResource PanelBgBrush}"
+            BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,1,0,0">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding ActiveTab.Breadcrumbs, FallbackValue=''}" TextTrimming="CharacterEllipsis" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="18">
+          <TextBlock Text="{Binding StatusMessage}" Classes="missing" MaxWidth="520"
+                     TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusMessage}"
+                     IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <Button Classes="flat" Padding="6,1" MinHeight="0" VerticalAlignment="Center"
+                  Command="{Binding ToggleProblemsPanelCommand}" ToolTip.Tip="Проблеми (Alt+6)">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <PathIcon Data="{StaticResource IconCheck}" Width="11" Height="11" Foreground="{DynamicResource SuccessBrush}"
+                        IsVisible="{Binding HasNoProblems}" />
+              <PathIcon Data="{StaticResource IconError}" Width="11" Height="11" Foreground="{DynamicResource ErrorBrush}"
+                        IsVisible="{Binding HasErrors}" />
+              <TextBlock Text="{Binding ErrorCount}" IsVisible="{Binding HasErrors}" />
+              <PathIcon Data="{StaticResource IconWarning}" Width="11" Height="11" Foreground="{DynamicResource WarningBrush}"
+                        IsVisible="{Binding HasWarnings}" Margin="4,0,0,0" />
+              <TextBlock Text="{Binding WarningCount}" IsVisible="{Binding HasWarnings}" />
+            </StackPanel>
+          </Button>
+          <TextBlock Text="{Binding BackgroundActivity}"
+                     IsVisible="{Binding BackgroundActivity, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <Button Classes="flat" Padding="6,1" MinHeight="0" VerticalAlignment="Center"
+                  ToolTip.Tip="Мова, якою показувати назви фокусів, подій, ідей…">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <PathIcon Data="{StaticResource IconLocalisation}" Width="11" Height="11" />
+              <TextBlock Text="{Binding LanguageShort}" />
+            </StackPanel>
+            <Button.Flyout>
+              <MenuFlyout ItemsSource="{Binding LanguageOptions}" Placement="TopEdgeAlignedRight">
+                <MenuFlyout.ItemContainerTheme>
+                  <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}"
+                                x:DataType="vm:LanguageOptionViewModel">
+                    <Setter Property="Header" Value="{Binding Title}" />
+                    <Setter Property="Command" Value="{Binding SelectCommand}" />
+                    <Setter Property="ToggleType" Value="Radio" />
+                    <Setter Property="IsChecked" Value="{Binding IsSelected, Mode=OneWay}" />
+                  </ControlTheme>
+                </MenuFlyout.ItemContainerTheme>
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+          <StackPanel Orientation="Horizontal" Spacing="18" IsVisible="{Binding HasActiveTextTab}">
+            <Button Classes="flat status-problems" Padding="6,1" MinHeight="0" Click="OnProblemsClick"
+                    IsVisible="{Binding ActiveTextTab.IsScript, FallbackValue=False}"
+                    ToolTip.Tip="Наступна помилка (F2), попередня (Shift+F2)">
+              <StackPanel Orientation="Horizontal" Spacing="5">
+                <PathIcon Data="{StaticResource IconWarning}" Width="11" Height="11"
+                          Classes.has-errors="{Binding ActiveTextTab.HasErrors, FallbackValue=False}" />
+                <TextBlock Text="{Binding ActiveTextTab.ProblemsText, FallbackValue=''}"
+                           Classes.missing="{Binding ActiveTextTab.HasErrors, FallbackValue=False}" />
+              </StackPanel>
+            </Button>
+            <TextBlock Text="{Binding ActiveTextTab.SaveStatus, FallbackValue=''}"
+                       Classes.missing="{Binding ActiveTextTab.HasSaveError, FallbackValue=False}" />
+            <TextBlock Text="{Binding ActiveTextTab.CaretPosition, FallbackValue=''}" ToolTip.Tip="Рядок:стовпець" />
+            <TextBlock Text="{Binding ActiveTextTab.LineEnding, FallbackValue=''}" ToolTip.Tip="Розділювач рядків" />
+            <TextBlock Text="{Binding ActiveTextTab.EncodingName, FallbackValue=''}" ToolTip.Tip="Кодування файлу" />
+          </StackPanel>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Tool window stripe -->
+    <Border DockPanel.Dock="Left" Width="40" Padding="0,6"
+            Background="{DynamicResource PanelBgBrush}"
+            BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,0,1,0">
+      <StackPanel HorizontalAlignment="Center" Spacing="4">
+        <ToggleButton Classes="stripe" IsChecked="{Binding IsProjectPanelVisible}" ToolTip.Tip="Проєкт (Alt+1)">
+          <PathIcon Data="{StaticResource IconFolder}" Width="16" Height="16" />
+        </ToggleButton>
+      </StackPanel>
+    </Border>
+
+    <Grid x:Name="WorkspaceGrid" ColumnDefinitions="280,Auto,*">
+
+      <!-- Project tool window -->
+      <Border x:Name="ProjectPanel" Background="{DynamicResource PanelBgBrush}">
+        <DockPanel DataContext="{Binding ProjectTree}" x:DataType="vm:ProjectTreeViewModel">
+          <Grid DockPanel.Dock="Top" Height="38" Margin="10,0,6,0" ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+            <TextBlock Classes="tool-title" Text="Проєкт" Margin="0,0,6,0" />
+            <!-- One click switches between content and files -->
+            <Button Grid.Column="1" Classes="flat" Padding="6,3" MinHeight="0" HorizontalAlignment="Left"
+                    Command="{Binding ToggleModeCommand}" ToolTip.Tip="{Binding ToggleModeTip}">
+              <StackPanel Orientation="Horizontal" Spacing="5">
+                <TextBlock Text="{Binding ModeTitle}" Classes="secondary" />
+                <PathIcon Data="{StaticResource IconSwap}" Width="10" Height="10"
+                          Foreground="{DynamicResource TextSecondaryBrush}" />
+              </StackPanel>
+            </Button>
+            <Button Grid.Column="2" Classes="flat" Padding="5" MinHeight="0" IsVisible="{Binding IsContentMode}"
+                    ToolTip.Tip="Створити">
+              <PathIcon Data="{StaticResource IconPlus}" Width="13" Height="13" />
+              <Button.Flyout>
+                <MenuFlyout Placement="BottomEdgeAlignedLeft"
+                            ItemsSource="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CreateOptions}"
+                            ItemContainerTheme="{StaticResource CreateMenuItem}" />
+              </Button.Flyout>
+            </Button>
+            <Button Grid.Column="3" Classes="flat" Padding="5" MinHeight="0"
+                    Command="{Binding CollapseAllCommand}" ToolTip.Tip="Згорнути все">
+              <PathIcon Data="{StaticResource IconCollapseAll}" Width="13" Height="13" />
+            </Button>
+            <Button Grid.Column="4" Classes="flat" Padding="5" MinHeight="0"
+                    Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ToggleProjectPanelCommand}"
+                    ToolTip.Tip="Сховати (Alt+1)">
+              <PathIcon Data="{StaticResource IconMinus}" Width="13" Height="13" />
+            </Button>
+          </Grid>
+
+          <Panel>
+            <TreeView x:Name="ProjectTreeView" Classes="project" IsVisible="{Binding IsFilesMode}"
+                      ItemsSource="{Binding Roots}" SelectedItem="{Binding SelectedNode}">
+              <TreeView.Styles>
+                <Style Selector="TreeViewItem" x:DataType="vm:FileNodeViewModel">
+                  <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                </Style>
+              </TreeView.Styles>
+              <TreeView.ContextMenu>
+                <ContextMenu x:DataType="vm:MainWindowViewModel"
+                             DataContext="{Binding $parent[Window].DataContext}">
+                  <MenuItem Header="Новий файл…" Command="{Binding NewFileCommand}"
+                            CommandParameter="{Binding ProjectTree.SelectedNode}">
+                    <MenuItem.Icon>
+                      <PathIcon Data="{StaticResource IconFile}" Width="12" Height="12" />
+                    </MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Нова папка…" Command="{Binding NewFolderCommand}"
+                            CommandParameter="{Binding ProjectTree.SelectedNode}">
+                    <MenuItem.Icon>
+                      <PathIcon Data="{StaticResource IconFolder}" Width="12" Height="12" />
+                    </MenuItem.Icon>
+                  </MenuItem>
+                  <Separator />
+                  <MenuItem Header="Відкрити" Command="{Binding OpenNodeCommand}"
+                            CommandParameter="{Binding ProjectTree.SelectedNode}" />
+                  <MenuItem Header="Показати в провіднику" Command="{Binding RevealNodeCommand}"
+                            CommandParameter="{Binding ProjectTree.SelectedNode}" />
+                  <Separator />
+                  <MenuItem Header="Видалити…" InputGesture="Delete" Command="{Binding DeleteNodeCommand}"
+                            CommandParameter="{Binding ProjectTree.SelectedNode}">
+                    <MenuItem.Icon>
+                      <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" />
+                    </MenuItem.Icon>
+                  </MenuItem>
+                </ContextMenu>
+              </TreeView.ContextMenu>
+              <TreeView.ItemTemplate>
+                <TreeDataTemplate x:DataType="vm:FileNodeViewModel" ItemsSource="{Binding Children}">
+                  <StackPanel Orientation="Horizontal" Spacing="6" Height="24">
+                    <PathIcon Width="14" Height="14" VerticalAlignment="Center"
+                              Data="{Binding Kind, Converter={x:Static conv:FileIcons.Geometry}}"
+                              Foreground="{Binding Kind, Converter={x:Static conv:FileIcons.Brush}}" />
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Description}" Classes="secondary" VerticalAlignment="Center"
+                               IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  </StackPanel>
+                </TreeDataTemplate>
+              </TreeView.ItemTemplate>
+            </TreeView>
+
+            <!-- Content mode: entities in virtual folders, regardless of which file defines them -->
+            <TreeView x:Name="ContentTreeView" Classes="project" IsVisible="{Binding IsContentMode}"
+                      ItemsSource="{Binding ContentRoots}" SelectedItem="{Binding SelectedContentNode}">
+              <TreeView.Styles>
+                <Style Selector="TreeViewItem" x:DataType="vm:ContentNodeViewModel">
+                  <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                </Style>
+              </TreeView.Styles>
+              <TreeView.ContextMenu>
+                <ContextMenu x:DataType="vm:MainWindowViewModel"
+                             DataContext="{Binding $parent[Window].DataContext}">
+                  <MenuItem Header="Створити" ItemsSource="{Binding CreateOptions}"
+                            ItemContainerTheme="{StaticResource CreateMenuItem}">
+                    <MenuItem.Icon>
+                      <PathIcon Data="{StaticResource IconPlus}" Width="12" Height="12" />
+                    </MenuItem.Icon>
+                  </MenuItem>
+                  <Separator />
+                  <MenuItem Header="Відкрити" InputGesture="Enter"
+                            Command="{Binding OpenContentNodeCommand}"
+                            CommandParameter="{Binding ProjectTree.SelectedContentNode}"
+                            IsEnabled="{Binding ProjectTree.SelectedContentNode.HasLocation, FallbackValue=False}" />
+                  <MenuItem Header="Перейти до коду"
+                            Command="{Binding GoToContentDefinitionCommand}"
+                            CommandParameter="{Binding ProjectTree.SelectedContentNode}"
+                            IsEnabled="{Binding ProjectTree.SelectedContentNode.HasLocation, FallbackValue=False}">
+                    <MenuItem.Icon>
+                      <PathIcon Data="{StaticResource IconScript}" Width="12" Height="12" />
+                    </MenuItem.Icon>
+                  </MenuItem>
+                  <Separator />
+                  <MenuItem Header="Перейменувати…" InputGesture="F2"
+                            Command="{Binding RenameContentNodeCommand}"
+                            CommandParameter="{Binding ProjectTree.SelectedContentNode}"
+                            IsEnabled="{Binding ProjectTree.SelectedContentNode.HasLocation, FallbackValue=False}">
+                    <MenuItem.Icon>
+                      <PathIcon Data="{StaticResource IconPencil}" Width="12" Height="12" />
+                    </MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Перейменувати лише визначення…" InputGesture="Shift+F2"
+                            Command="{Binding RenameContentNodeDefinitionCommand}"
+                            CommandParameter="{Binding ProjectTree.SelectedContentNode}"
+                            IsEnabled="{Binding ProjectTree.SelectedContentNode.HasLocation, FallbackValue=False}" />
+                  <MenuItem Header="Показати в провіднику" Command="{Binding RevealContentNodeCommand}"
+                            CommandParameter="{Binding ProjectTree.SelectedContentNode}"
+                            IsEnabled="{Binding ProjectTree.SelectedContentNode.HasLocation, FallbackValue=False}" />
+                </ContextMenu>
+              </TreeView.ContextMenu>
+              <TreeView.ItemTemplate>
+                <TreeDataTemplate x:DataType="vm:ContentNodeViewModel" ItemsSource="{Binding Children}">
+                  <StackPanel Orientation="Horizontal" Spacing="6" Height="24" Background="Transparent"
+                              ToolTip.Tip="{Binding ToolTip}">
+                    <PathIcon Width="14" Height="14" VerticalAlignment="Center"
+                              Data="{Binding Kind, Converter={x:Static conv:ContentIcons.Geometry}}"
+                              Foreground="{Binding Kind, Converter={x:Static conv:ContentIcons.Brush}}" />
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Classes.secondary="{Binding IsEmpty}"
+                               Classes.error="{Binding HasError}" Classes.warning="{Binding HasWarning}" />
+                    <TextBlock Text="{Binding Description}" Classes="secondary" VerticalAlignment="Center"
+                               IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  </StackPanel>
+                </TreeDataTemplate>
+              </TreeView.ItemTemplate>
+            </TreeView>
+
+            <TextBlock Classes="secondary" Margin="16,8" Text="Індексація вмісту моду…"
+                       IsVisible="{Binding IsContentLoadingShown}" />
+          </Panel>
+        </DockPanel>
+      </Border>
+
+      <GridSplitter x:Name="ProjectSplitter" Grid.Column="1" Width="1" MinWidth="1"
+                    Background="{DynamicResource SeparatorBrush}" ResizeDirection="Columns" />
+
+      <!-- Editor area -->
+      <DockPanel Grid.Column="2">
+        <Border DockPanel.Dock="Top" Height="38" IsVisible="{Binding HasActiveTab}"
+                BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,0,0,1">
+          <ListBox x:Name="TabStrip" Classes="tabs" ItemsSource="{Binding Tabs}"
+                   SelectedItem="{Binding ActiveTab}">
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" />
+              </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:DocumentTabViewModel">
+                <Border Classes="tab" Height="37" BorderThickness="0,0,0,2" Padding="12,0,6,0"
+                        Background="Transparent" ToolTip.Tip="{Binding DisplayPath}">
+                  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Panel>
+                      <PathIcon Width="13" Height="13" IsVisible="{Binding !IsEntity}"
+                                Data="{Binding Kind, Converter={x:Static conv:FileIcons.Geometry}}"
+                                Foreground="{Binding Kind, Converter={x:Static conv:FileIcons.Brush}}" />
+                      <PathIcon Width="13" Height="13" IsVisible="{Binding IsEntity}"
+                                Data="{Binding EntityKind, Converter={x:Static conv:ContentIcons.Geometry}}"
+                                Foreground="{Binding EntityKind, Converter={x:Static conv:ContentIcons.Brush}}" />
+                    </Panel>
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
+                               Classes.missing="{Binding HasSaveError}" />
+                    <Button Classes="flat tab-close" Padding="4" MinHeight="0" VerticalAlignment="Center"
+                            Command="{Binding CloseCommand}" ToolTip.Tip="Закрити (Ctrl+F4)">
+                      <PathIcon Data="{StaticResource IconClose}" Width="8" Height="8" />
+                    </Button>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+
+        <!-- Problems tool window (Alt+6) -->
+        <Border DockPanel.Dock="Bottom" Height="220" IsVisible="{Binding IsProblemsPanelVisible}"
+                Background="{DynamicResource PanelBgBrush}"
+                BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,1,0,0">
+          <DockPanel>
+            <Grid DockPanel.Dock="Top" Height="32" Margin="10,0,6,0" ColumnDefinitions="Auto,*,Auto">
+              <TextBlock Classes="tool-title" Text="Проблеми" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0" VerticalAlignment="Center">
+                <PathIcon Data="{StaticResource IconError}" Width="11" Height="11" Foreground="{DynamicResource ErrorBrush}" />
+                <TextBlock Text="{Binding ErrorCount}" Classes="secondary" />
+                <PathIcon Data="{StaticResource IconWarning}" Width="11" Height="11" Foreground="{DynamicResource WarningBrush}"
+                          Margin="6,0,0,0" />
+                <TextBlock Text="{Binding WarningCount}" Classes="secondary" />
+              </StackPanel>
+              <Button Grid.Column="2" Classes="flat" Padding="5" MinHeight="0" Command="{Binding ToggleProblemsPanelCommand}"
+                      ToolTip.Tip="Сховати (Alt+6)">
+                <PathIcon Data="{StaticResource IconMinus}" Width="13" Height="13" />
+              </Button>
+            </Grid>
+            <ListBox x:Name="ProblemsList" Classes="dense" ItemsSource="{Binding ProblemRows}" Background="Transparent">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ProblemRowViewModel">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" Height="22" Background="Transparent">
+                    <PathIcon Width="12" Height="12" Margin="0,0,8,0"
+                              Data="{Binding Problem.Severity, Converter={x:Static conv:ProblemIcons.Geometry}}"
+                              Foreground="{Binding Problem.Severity, Converter={x:Static conv:ProblemIcons.Brush}}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Message}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0" IsVisible="{Binding HasEntity}">
+                      <PathIcon Width="11" Height="11"
+                                Data="{Binding EntityKind, Converter={x:Static conv:ContentIcons.Geometry}}"
+                                Foreground="{Binding EntityKind, Converter={x:Static conv:ContentIcons.Brush}}" />
+                      <TextBlock Text="{Binding Entity}" FontFamily="{StaticResource EditorFont}" FontSize="12" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="3" Text="{Binding File}" Classes="secondary" FontSize="11" Margin="12,0,4,0"
+                               VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
+        </Border>
+
+        <Panel>
+          <ae:TextEditor x:Name="Editor" IsVisible="{Binding HasActiveTextTab}"
+                         ShowLineNumbers="True" WordWrap="False"
+                         FontFamily="{StaticResource EditorFont}" FontSize="13"
+                         Background="{DynamicResource WindowBgBrush}"
+                         Foreground="{DynamicResource TextBrush}"
+                         LineNumbersForeground="{DynamicResource EditorLineNumberBrush}"
+                         HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                         Padding="6,4,0,0" />
+
+          <Panel IsVisible="{Binding HasActiveImageTab}">
+            <views:ImageViewer DataContext="{Binding ActiveImageTab}" />
+          </Panel>
+
+          <!-- Graphical editors of game entities -->
+          <ContentControl Content="{Binding ActiveEntityTab}" IsVisible="{Binding HasActiveEntityTab}">
+            <ContentControl.DataTemplates>
+              <DataTemplate DataType="ent:FocusTreeTabViewModel">
+                <entv:FocusTreeView />
+              </DataTemplate>
+              <DataTemplate DataType="ent:EventGraphTabViewModel">
+                <entv:EventGraphView />
+              </DataTemplate>
+              <DataTemplate DataType="ent:EntityCardTabViewModel">
+                <entv:EntityCardView />
+              </DataTemplate>
+            </ContentControl.DataTemplates>
+          </ContentControl>
+
+          <!-- Empty editor: shortcut hints, as in JetBrains IDEs -->
+          <Grid IsVisible="{Binding !HasActiveTab}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto,Auto">
+            <Grid.Styles>
+              <Style Selector="TextBlock">
+                <Setter Property="Margin" Value="0,5" />
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+              </Style>
+              <Style Selector="TextBlock.key">
+                <Setter Property="Margin" Value="16,5,0,5" />
+                <Setter Property="Foreground" Value="{DynamicResource AccentHoverBrush}" />
+              </Style>
+            </Grid.Styles>
+            <TextBlock Text="Панель проєкту" HorizontalAlignment="Right" />
+            <TextBlock Grid.Column="1" Classes="key" Text="Alt+1" />
+            <TextBlock Grid.Row="1" Text="Відкрити мод" HorizontalAlignment="Right" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Classes="key" Text="Ctrl+O" />
+            <TextBlock Grid.Row="2" Text="Налаштування" HorizontalAlignment="Right" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Classes="key" Text="Ctrl+Alt+S" />
+          </Grid>
+        </Panel>
+      </DockPanel>
+    </Grid>
+  </DockPanel>
+</Window>

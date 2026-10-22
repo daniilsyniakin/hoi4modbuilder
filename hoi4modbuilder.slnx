@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="HoI4ModBuilder.Clausewitz.Tests/HoI4ModBuilder.Clausewitz.Tests.csproj" />
+  <Project Path="HoI4ModBuilder.Clausewitz/HoI4ModBuilder.Clausewitz.csproj" />
+  <Project Path="hoi4modbuilder.csproj" />
+  <Project Path="HoI4ModBuilder.Game.Tests/HoI4ModBuilder.Game.Tests.csproj" />
+  <Project Path="HoI4ModBuilder.Game/HoI4ModBuilder.Game.csproj" />
+</Solution>
