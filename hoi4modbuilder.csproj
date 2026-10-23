@@ -11,6 +11,7 @@
     <!-- Where updates come from; the release workflow passes the repository it builds. -->
     <RepositoryUrl Condition="'$(RepositoryUrl)' == ''">https://github.com/daniilsyniakin/hoi4modbuilder</RepositoryUrl>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationIcon>Assets/app.ico</ApplicationIcon> 
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +22,11 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Velopack" Version="1.2.161" />
+  </ItemGroup>
+
+  
+  <ItemGroup>
+      <AvaloniaResource Include="Assets/app.png" />
   </ItemGroup>
 
   <!-- The app project sits in the repository root, so keep its globs out of the sibling projects. -->

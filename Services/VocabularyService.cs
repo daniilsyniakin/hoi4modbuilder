@@ -16,6 +16,14 @@ public static class VocabularyService
     // Text files that happen to have a script extension (credits, licences) produce garbage.
     private const int MaxDiagnosticsPerFile = 10;
 
+    // Generated data (a 20 MB scripted localisation, map/unitstacks.txt) adds no words worth
+    // suggesting but takes seconds to parse.
+    private const long MaxFileSize = 4 * 1024 * 1024;
+
+    // A few threads at most: every thread builds big trees, and with more of them they mostly
+    // wait for each other in the garbage collector.
+    private static int Parallelism => Math.Clamp(Environment.ProcessorCount / 4, 1, 3);
+
     private static readonly HashSet<string> IgnoredFolders = new(StringComparer.OrdinalIgnoreCase) { ".git", ".vs", ".idea" };
 
     private static readonly string CachePath = Path.Combine(
@@ -84,11 +92,14 @@ public static class VocabularyService
 
         Parallel.ForEach(
             files,
+            new ParallelOptions { MaxDegreeOfParallelism = Parallelism },
             () => new ScriptVocabulary(),
             (file, _, local) =>
             {
                 try
                 {
+                    if (new FileInfo(file).Length > MaxFileSize)
+                        return local;
                     var tree = SyntaxTree.Parse(TextFileCodec.Decode(File.ReadAllBytes(file)).Text);
                     if (tree.Diagnostics.Count <= MaxDiagnosticsPerFile)
                         local.AddFile(tree, Path.GetDirectoryName(Path.GetRelativePath(root, file)) ?? "");

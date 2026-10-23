@@ -31,12 +31,16 @@ public sealed record Problem(
 /// <param name="HasLocalisation">Null when no language is chosen (text checks are skipped).</param>
 /// <param name="SeenInGame">Whether the game's own scripts use <c>key</c> inside a block of <c>blockKey</c>.</param>
 /// <param name="IsGameScript">Whether the game defines a scripted effect (or trigger) called <c>key</c>.</param>
+/// <param name="StateExists">Null while the map's states are still loading (state checks are skipped).</param>
+/// <param name="CountryExists">Null while the country tags are still loading.</param>
 public sealed record ValidationContext(
     ScriptSchema Schema,
     Func<string, bool>? SpriteExists,
     Func<string, bool>? HasLocalisation,
     Func<string?, string, bool> SeenInGame,
-    Func<string, ScriptContext, bool> IsGameScript);
+    Func<string, ScriptContext, bool> IsGameScript,
+    Func<int, bool>? StateExists = null,
+    Func<string, bool>? CountryExists = null);
 
 /// <summary>
 /// Finds mistakes a modder would otherwise only see in the game (or its error.log): references to
@@ -93,7 +97,31 @@ public static class ModValidator
         }
 
         CheckFocusLayout(index, problems);
+        CheckStates(files, context, problems);
         return problems;
+    }
+
+    /// <summary>States and countries that scripts give, claim or check, but that don't exist.</summary>
+    private static void CheckStates(IReadOnlyList<(string File, string Relative, SyntaxTree Tree)> files, ValidationContext context,
+        List<Problem> problems)
+    {
+        if (context.StateExists is null && context.CountryExists is null)
+            return;
+        foreach (var file in files)
+        {
+            if (file.Relative.StartsWith("history/states/", StringComparison.OrdinalIgnoreCase))
+                continue;
+            foreach (var reference in StateReferences.Find(file.Tree, file.Relative))
+            {
+                var owner = reference.Usage.Owner;
+                if (context.StateExists is { } stateExists && !stateExists(reference.State))
+                    problems.Add(new Problem(ProblemSeverity.Error, $"Області {reference.State} немає ні в моді, ні в грі",
+                        owner?.Kind, owner?.Id, file.File, reference.Usage.Start, ""));
+                if (reference.Country is { } country && context.CountryExists is { } countryExists && !countryExists(country))
+                    problems.Add(new Problem(ProblemSeverity.Error, $"Країни «{country}» немає ні в моді, ні в грі ({reference.Key})",
+                        owner?.Kind, owner?.Id, file.File, reference.Usage.Start, ""));
+            }
+        }
     }
 
     /// <summary>Two focuses of one tree in the same grid cell overlap in the game.</summary>

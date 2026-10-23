@@ -3,6 +3,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HoI4ModBuilder.Game.Sprites;
+using HoI4ModBuilder.Game.Tooltips;
 using HoI4ModBuilder.Game.Validation;
 using HoI4ModBuilder.Services;
 using HoI4ModBuilder.ViewModels.Entities.Inspector;
@@ -68,6 +69,10 @@ public sealed partial class PropertyPanelViewModel : ViewModelBase
     [ObservableProperty]
     public partial IReadOnlyList<Problem> Problems { get; set; } = [];
 
+    /// <summary>What the game's tooltip of the object says: its modifiers and effects in words.</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<TooltipLine>? Tooltip { get; set; }
+
     /// <summary>The entity's own block: its rows and the "add property" box.</summary>
     [ObservableProperty]
     public partial BlockNode? Root { get; set; }
@@ -81,6 +86,7 @@ public sealed partial class PropertyPanelViewModel : ViewModelBase
         Subtitle = newer.Subtitle;
         Description = newer.Description;
         Problems = newer.Problems;
+        Tooltip = newer.Tooltip;
         TitleText = LocalisedTextViewModel.Merge(TitleText, newer.TitleText);
         DescriptionText = LocalisedTextViewModel.Merge(DescriptionText, newer.DescriptionText);
         PictureEditor = newer.PictureEditor;
@@ -145,15 +151,21 @@ public sealed partial class LocalisedTextViewModel : ViewModelBase
     }
 }
 
-/// <summary>Changing a picture by choosing a sprite from the game and the mod.</summary>
-/// <param name="Prefixes">Sprite name prefixes that fit, e.g. <c>GFX_goal_</c> for focuses.</param>
-/// <param name="Apply">Writes the chosen sprite (full <c>GFX_…</c> name) into the script.</param>
-public sealed class PictureEditor(GameAssets assets, IReadOnlyList<string> prefixes, Action<string> apply)
+/// <summary>Changing a picture by choosing a sprite from the game and the mod, or importing a picture file.</summary>
+/// <param name="prefixes">Sprite name prefixes that fit, e.g. <c>GFX_goal_</c> for focuses.</param>
+/// <param name="apply">Writes the chosen sprite (full <c>GFX_…</c> name) into the script.</param>
+/// <param name="import">Imports a picture file as a new sprite and applies it; false if it failed (already reported).</param>
+public sealed class PictureEditor(GameAssets assets, IReadOnlyList<string> prefixes, Action<string> apply, Func<string, bool>? import = null)
 {
     private SpritePickerViewModel? _picker;
 
     /// <summary>Built on first use: listing thousands of sprites isn't free.</summary>
-    public SpritePickerViewModel Picker => _picker ??= new SpritePickerViewModel(assets, prefixes, apply);
+    public SpritePickerViewModel Picker => _picker ??= new SpritePickerViewModel(assets, prefixes, apply, import);
+
+    public bool CanImport => import is not null;
+
+    /// <summary>Imports a dropped or chosen picture file.</summary>
+    public bool Import(string path) => import?.Invoke(path) ?? false;
 }
 
 /// <summary>A searchable list of sprites; thumbnails load only for rows that scroll into view.</summary>
@@ -164,9 +176,12 @@ public sealed partial class SpritePickerViewModel : ViewModelBase
     private readonly List<SpriteChoiceViewModel> _all;
     private readonly Action<string> _apply;
 
-    public SpritePickerViewModel(GameAssets assets, IReadOnlyList<string> prefixes, Action<string> apply)
+    private readonly Func<string, bool>? _import;
+
+    public SpritePickerViewModel(GameAssets assets, IReadOnlyList<string> prefixes, Action<string> apply, Func<string, bool>? import = null)
     {
         _apply = apply;
+        _import = import;
         _all = assets.Sprites.All
             .Where(s => prefixes.Any(p => s.Name.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
             // "_shine" sprites are the animated glow drawn over an icon, not icons of their own.
@@ -188,6 +203,11 @@ public sealed partial class SpritePickerViewModel : ViewModelBase
     partial void OnSearchChanged(string? value) => Filter();
 
     public void Choose(SpriteChoiceViewModel choice) => _apply(choice.Name);
+
+    /// <summary>Pictures of this kind can be imported from files.</summary>
+    public bool CanImport => _import is not null;
+
+    public bool Import(string path) => _import?.Invoke(path) ?? false;
 
     private void Filter()
     {

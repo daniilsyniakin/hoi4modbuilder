@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HoI4ModBuilder.ViewModels"
+             xmlns:conv="using:HoI4ModBuilder.Views.Converters"
+             x:Class="HoI4ModBuilder.Views.UsagesView"
+             x:DataType="vm:UsagesViewModel">
+  <UserControl.Styles>
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.link:pointerover TextBlock">
+      <Setter Property="TextDecorations" Value="Underline" />
+    </Style>
+    <Style Selector="Border.definition">
+      <Setter Property="Background" Value="#2262D26F" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Padding" Value="4,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+  </UserControl.Styles>
+
+  <Panel>
+    <ScrollViewer>
+      <ItemsControl ItemsSource="{Binding Files}" Margin="10,4">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:UsageFileViewModel">
+            <StackPanel Margin="0,2,0,6">
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2">
+                <PathIcon Data="{StaticResource IconScript}" Width="11" Height="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                <TextBlock Text="{Binding File}" FontSize="12" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Count}" Classes="secondary" FontSize="11" VerticalAlignment="Center" />
+              </StackPanel>
+              <ItemsControl ItemsSource="{Binding Rows}" Margin="18,0,0,0">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:UsageRowViewModel">
+                    <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" Margin="0,1">
+                      <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,10,0">
+                        <PathIcon Width="11" Height="11" IsVisible="{Binding HasOwner}"
+                                  Data="{Binding OwnerKind, Converter={x:Static conv:ContentIcons.Geometry}}"
+                                  Foreground="{Binding OwnerKind, Converter={x:Static conv:ContentIcons.Brush}}" />
+                        <Button Classes="link" Command="{Binding Open}">
+                          <TextBlock Text="{Binding Owner}" FontSize="12" Foreground="{DynamicResource AccentHoverBrush}" />
+                        </Button>
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Text="{Binding Context}" Classes="secondary" FontSize="11" Margin="0,0,10,0"
+                                 VerticalAlignment="Center" />
+                      <Border Grid.Column="2" Classes="definition" IsVisible="{Binding IsDefinition}" Margin="0,0,10,0">
+                        <TextBlock Text="визначення" FontSize="11" Foreground="{DynamicResource SuccessBrush}" />
+                      </Border>
+                      <TextBlock Grid.Column="3" Text="{Binding Snippet}" FontFamily="{StaticResource EditorFont}" FontSize="11"
+                                 Classes="secondary" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      <Button Grid.Column="4" Classes="link" Command="{Binding OpenCode}" Margin="10,0,0,0">
+                        <TextBlock Text="{Binding LineText}" FontSize="11" Classes="secondary" />
+                      </Button>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+    <TextBlock Text="Використань немає" Classes="secondary" HorizontalAlignment="Center" VerticalAlignment="Center"
+               IsVisible="{Binding IsEmpty}" />
+  </Panel>
+</UserControl>

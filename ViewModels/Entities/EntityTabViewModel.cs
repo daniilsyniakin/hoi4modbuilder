@@ -8,6 +8,7 @@ using HoI4ModBuilder.Clausewitz.Editing;
 using HoI4ModBuilder.Clausewitz.Syntax;
 using HoI4ModBuilder.Game.Content;
 using HoI4ModBuilder.Game.Schema;
+using HoI4ModBuilder.Game.Sprites;
 using HoI4ModBuilder.Game.Validation;
 using HoI4ModBuilder.Services;
 using HoI4ModBuilder.ViewModels.Entities.Inspector;
@@ -22,12 +23,19 @@ public sealed record EntityContext(
     GameAssets Assets,
     LocalisationService Localisation,
     LocalisationEditor Texts,
+    SpriteImporter Sprites,
     ProblemsService Problems,
+    TooltipService Tooltips,
+    TechnologyService Technologies,
+    MapService Map,
     Func<ScriptVocabulary?> Vocabulary,
     Action<string, int> OpenInCode,
     Action<ContentKind, string> OpenEntity,
     Func<ContentKind, string, bool, Task> Rename,
-    Action<string?> ReportError);
+    Action<string?> ReportError,
+    Action<string> FindUsages,
+    Func<string, string, string, string?, Func<string, string?>, string?, Task<string?>> Prompt,
+    Action<Action<int>> PickState);
 
 /// <summary>
 /// A tab showing a game entity graphically (focus tree, event graph, idea card…). It re-reads the
@@ -63,6 +71,7 @@ public abstract partial class EntityTabViewModel : DocumentTabViewModel
         context.Localisation.Changed += OnServiceChanged;
         context.Assets.SpritesChanged += OnServiceChanged;
         context.Problems.Changed += OnServiceChanged;
+        context.Tooltips.Changed += OnServiceChanged;
     }
 
     protected EntityContext Context { get; }
@@ -153,6 +162,7 @@ public abstract partial class EntityTabViewModel : DocumentTabViewModel
         Context.Localisation.Changed -= OnServiceChanged;
         Context.Assets.SpritesChanged -= OnServiceChanged;
         Context.Problems.Changed -= OnServiceChanged;
+        Context.Tooltips.Changed -= OnServiceChanged;
     }
 
     /// <summary>Whether a change to <paramref name="path"/> can affect this view.</summary>
@@ -197,9 +207,28 @@ public abstract partial class EntityTabViewModel : DocumentTabViewModel
             apply(image);
     }
 
-    /// <summary>A click-to-change picture choosing among sprites whose names start with <paramref name="prefixes"/>.</summary>
-    protected PictureEditor SpritePicker(IReadOnlyList<string> prefixes, Action<string> apply) =>
-        new(Context.Assets, prefixes, apply);
+    /// <summary>
+    /// A click-to-change picture choosing among sprites whose names start with <paramref name="prefixes"/>,
+    /// or a picture file imported as a new sprite of that kind.
+    /// </summary>
+    protected PictureEditor SpritePicker(IReadOnlyList<string> prefixes, Action<string> apply)
+    {
+        Func<string, bool>? import = null;
+        if (SpriteImport.KindFor(prefixes) is { } kind)
+        {
+            import = path =>
+            {
+                // The texture, the .gfx entry and the picture of the entity: one undo step.
+                using var action = Action($"Картинка «{Path.GetFileName(path)}»");
+                var (sprite, error) = Context.Sprites.Import(path, kind);
+                if (sprite is not null)
+                    apply(sprite);
+                Context.ReportError(error);
+                return sprite is not null;
+            };
+        }
+        return new PictureEditor(Context.Assets, prefixes, apply, import);
+    }
 
     /// <summary>Builds the inspector for an entity block.</summary>
     /// <param name="identity">The object; a panel for the same object is updated in place.</param>
@@ -248,6 +277,7 @@ public abstract partial class EntityTabViewModel : DocumentTabViewModel
             Root = builder.BuildRoot(block, contextKey, schema, skip ?? NoKeys, rootContext),
             // Problems of the object as a whole (a missing name, a missing sprite) head the panel.
             Problems = all.Where(p => p.Path == pathPrefix).ToList(),
+            Tooltip = Context.Tooltips.For(contextKey, entity?.Kind, title, block),
             TitleText = LocalisedText(titleKey, placeholder: title),
             DescriptionText = LocalisedText(descriptionKey, placeholder: "Опис"),
         };
@@ -401,6 +431,28 @@ public abstract partial class EntityTabViewModel : DocumentTabViewModel
             return usage is not null ? "0" : "yes";
         }
 
+        public IReadOnlyList<HoI4ModBuilder.Game.Tooltips.TextRun>? Preview(ScriptContext scriptContext, PropertySyntax property) =>
+            context.Tooltips.Preview(scriptContext, property);
+
+        public string? ModifierName(string key) => context.Tooltips.ModifierName(key);
+
+        public bool TakesState(string key) => StateReferences.TakesStateId(key);
+
+        public string? StateName(string value)
+        {
+            if (!int.TryParse(value, out var id) || context.Map.Data.State(id) is not { } state)
+                return null;
+            var name = context.Localisation.Text(state.NameKey ?? $"STATE_{id}") ?? state.NameKey;
+            if (state.Owner is not { } owner)
+                return name;
+            // The country as the game names it at the start: by its ruling party.
+            var country = (context.Map.Data.RulingParties.TryGetValue(owner, out var party) ? context.Localisation.Text($"{owner}_{party}") : null)
+                          ?? context.Localisation.Text(owner) ?? owner;
+            return $"{name} · {country}";
+        }
+
+        public void PickState(Action<int> apply) => context.PickState(apply);
+
         public string? Describe(string value)
         {
             if (value.Equals("yes", StringComparison.OrdinalIgnoreCase) || value.Equals("no", StringComparison.OrdinalIgnoreCase)
@@ -420,10 +472,18 @@ public abstract partial class EntityTabViewModel : DocumentTabViewModel
 
         private List<string> Ids(ContentKind kind)
         {
-            _ids ??= context.Content.Files.Values
-                .SelectMany(ContentParser.Flatten)
-                .GroupBy(e => e.Kind)
-                .ToDictionary(g => g.Key, g => g.Select(e => e.Id).Distinct().OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList());
+            if (_ids is null)
+            {
+                _ids = context.Content.Files.Values
+                    .SelectMany(ContentParser.Flatten)
+                    .GroupBy(e => e.Kind)
+                    .ToDictionary(g => g.Key, g => g.Select(e => e.Id).Distinct().OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList());
+                // Technologies: the game's too (has_tech names vanilla ones most of the time), the mod's first.
+                _ids[ContentKind.Technology] = (_ids.GetValueOrDefault(ContentKind.Technology) ?? [])
+                    .Concat(context.Technologies.Catalog.All.Select(t => t.Id))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
             return _ids.GetValueOrDefault(kind) ?? [];
         }
     }

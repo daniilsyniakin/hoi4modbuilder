@@ -2,8 +2,10 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using HoI4ModBuilder.Services;
 using HoI4ModBuilder.ViewModels.Entities;
 using HoI4ModBuilder.ViewModels.Entities.Inspector;
 
@@ -23,10 +25,37 @@ public partial class PropertyPanel : UserControl
         AddHandler(GotFocusEvent, OnGotFocus, RoutingStrategies.Bubble);
         AddHandler(AutoCompleteBox.SelectionChangedEvent, OnSuggestionChosen, RoutingStrategies.Bubble);
 
+        DragDrop.SetAllowDrop(PictureButton, true);
+        PictureButton.AddHandler(DragDrop.DragOverEvent, OnPictureDragOver);
+        PictureButton.AddHandler(DragDrop.DragLeaveEvent, (_, _) => PictureButton.Classes.Set("drop", false));
+        PictureButton.AddHandler(DragDrop.DropEvent, OnPictureDrop);
+
         // The picker lists thousands of sprites, so it is only built when the flyout opens.
         var flyout = (Flyout)PictureButton.Flyout!;
         flyout.Opening += (_, _) => Picker.DataContext = (DataContext as PropertyPanelViewModel)?.PictureEditor?.Picker;
         Picker.Chosen += (_, _) => flyout.Hide();
+    }
+
+    /// <summary>The first dragged file that is a picture, if any.</summary>
+    private static string? DraggedPicture(DragEventArgs e) =>
+        e.DataTransfer.TryGetFiles()?
+            .Select(f => f.TryGetLocalPath())
+            .FirstOrDefault(p => p is not null && SpriteImporter.CanImport(p));
+
+    private void OnPictureDragOver(object? sender, DragEventArgs e)
+    {
+        var accepts = DataContext is PropertyPanelViewModel { PictureEditor.CanImport: true } && DraggedPicture(e) is not null;
+        e.DragEffects = accepts ? DragDropEffects.Copy : DragDropEffects.None;
+        PictureButton.Classes.Set("drop", accepts);
+        e.Handled = true;
+    }
+
+    private void OnPictureDrop(object? sender, DragEventArgs e)
+    {
+        PictureButton.Classes.Set("drop", false);
+        if (DataContext is PropertyPanelViewModel { PictureEditor: { } editor } && DraggedPicture(e) is { } path)
+            editor.Import(path);
+        e.Handled = true;
     }
 
     private static AutoCompleteBox? AutoCompleteOf(RoutedEventArgs e) =>

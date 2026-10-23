@@ -9,6 +9,7 @@ using HoI4ModBuilder.Clausewitz.Editing;
 using HoI4ModBuilder.Clausewitz.Syntax;
 using HoI4ModBuilder.Game.Content;
 using HoI4ModBuilder.Game.Schema;
+using HoI4ModBuilder.Game.Tooltips;
 using HoI4ModBuilder.Services;
 
 namespace HoI4ModBuilder.ViewModels.Entities;
@@ -22,10 +23,10 @@ public sealed partial class EventOptionViewModel(EventNodeViewModel owner, int i
 
     public required string Text { get; init; }
 
-    /// <summary>Outline of the effects, a few lines at most.</summary>
-    public required string Effects { get; init; }
+    /// <summary>What the option does in words, a few lines at most.</summary>
+    public required IReadOnlyList<TextRun> Effects { get; init; }
 
-    public bool HasEffects => Effects.Length > 0;
+    public bool HasEffects => Effects.Count > 0;
 
     /// <summary>Offset from the top of the options area.</summary>
     public double Offset { get; init; }
@@ -111,6 +112,7 @@ public sealed partial class EventGraphTabViewModel : EntityTabViewModel
     // Re-parsing every content file on each refresh is wasteful; keep trees while the text is unchanged.
     private readonly Dictionary<string, (string Text, SyntaxTree Tree)> _trees = new(Paths.Comparer);
     private readonly Dictionary<string, (EventDefinition Event, string File)> _events = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, BlockSyntax> _eventBlocks = new(StringComparer.OrdinalIgnoreCase);
 
     public EventGraphTabViewModel(EntityContext context, string eventId, string filePath, Action<DocumentTabViewModel> close)
         : base(context, ContentKind.Event, eventId, filePath, close)
@@ -169,6 +171,7 @@ public sealed partial class EventGraphTabViewModel : EntityTabViewModel
     {
         var triggers = new List<(EventTrigger Trigger, string File)>();
         _events.Clear();
+        _eventBlocks.Clear();
         foreach (var file in Context.Content.Files.Keys.ToList())
         {
             if (Parse(file) is not { } parsed)
@@ -177,8 +180,9 @@ public sealed partial class EventGraphTabViewModel : EntityTabViewModel
             var properties = ContentParser.PropertiesByPosition(parsed.Tree);
             foreach (var entry in ContentParser.Parse(parsed.Tree, relative).Where(e => e.Kind == ContentKind.Event))
             {
-                if (properties.TryGetValue(entry.Position, out var property) && Events.Read(property) is { } definition)
-                    _events.TryAdd(definition.Id, (definition, file));
+                if (properties.TryGetValue(entry.Position, out var property) && Events.Read(property) is { } definition
+                    && _events.TryAdd(definition.Id, (definition, file)) && property.Value is BlockSyntax block)
+                    _eventBlocks[definition.Id] = block;
             }
             triggers.AddRange(Events.FindTriggers(parsed.Tree, relative).Select(t => (t, file)));
         }
@@ -312,16 +316,25 @@ public sealed partial class EventGraphTabViewModel : EntityTabViewModel
         };
 
         var offset = 0.0;
+        var optionBlocks = _eventBlocks.TryGetValue(id, out var eventBlock) ? ScriptRead.Blocks(eventBlock, "option").ToList() : [];
+        var describer = new EffectDescriber(Context.Tooltips);
         foreach (var option in definition.Options)
         {
-            var lines = option.Effects.Take(MaxEffectLines).ToList();
-            if (option.Effects.Count > MaxEffectLines)
-                lines[^1] = $"… ще {option.Effects.Count - MaxEffectLines + 1}";
+            // In the game's words when a language is chosen; as written otherwise.
+            var described = Context.Localisation.Language is not null && optionBlocks.ElementAtOrDefault(option.Index) is { } optionBlock
+                ? describer.Describe(optionBlock)
+                : option.Effects.Select(e => new TooltipLine(0, [new TextRun(e)])).ToList();
+            var lines = described.Take(MaxEffectLines).ToList();
+            if (described.Count > MaxEffectLines)
+                lines[^1] = new TooltipLine(0, [new TextRun($"… ще {described.Count - MaxEffectLines + 1}")]);
             var height = OptionBaseHeight + lines.Count * EffectLineHeight;
             node.Options.Add(new EventOptionViewModel(node, option.Index)
             {
                 Text = Context.Localisation.Text(option.Name) ?? option.Name ?? $"Варіант {option.Index + 1}",
-                Effects = string.Join("\n", lines),
+                Effects = lines.SelectMany((line, i) => line.Runs
+                        .Select(r => r with { Text = r.Text.Replace('\n', ' ') })
+                        .Prepend(new TextRun((i == 0 ? "" : "\n") + new string(' ', line.Indent * 2))))
+                    .ToList(),
                 Offset = offset,
                 Height = height,
                 Position = option.Position,

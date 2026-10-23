@@ -42,11 +42,18 @@ public sealed record SpriteDefinition(
 /// </summary>
 public sealed class SpriteCatalog
 {
-    private readonly Dictionary<string, SpriteDefinition> _sprites;
+    // Per file, in priority order (lowest first), so one changed file can be re-read alone.
+    private readonly IReadOnlyList<(VirtualFile File, IReadOnlyList<SpriteDefinition> Sprites)> _files;
+    private readonly Dictionary<string, SpriteDefinition> _sprites = new(StringComparer.OrdinalIgnoreCase);
 
-    private SpriteCatalog(Dictionary<string, SpriteDefinition> sprites) => _sprites = sprites;
+    private SpriteCatalog(IReadOnlyList<(VirtualFile File, IReadOnlyList<SpriteDefinition> Sprites)> files)
+    {
+        _files = files;
+        foreach (var definition in files.SelectMany(f => f.Sprites))
+            _sprites[definition.Name] = definition;
+    }
 
-    public static SpriteCatalog Empty { get; } = new(new Dictionary<string, SpriteDefinition>(StringComparer.OrdinalIgnoreCase));
+    public static SpriteCatalog Empty { get; } = new([]);
 
     public int Count => _sprites.Count;
 
@@ -62,25 +69,38 @@ public sealed class SpriteCatalog
             .ToList();
 
         // Parsing is the expensive part and files are independent.
-        var parsed = new List<SpriteDefinition>[files.Count];
-        Parallel.For(0, files.Count, i =>
-        {
-            parsed[i] = [];
-            try
-            {
-                var text = Encoding.UTF8.GetString(File.ReadAllBytes(files[i].FullPath));
-                parsed[i].AddRange(Parse(SyntaxTree.Parse(text), files[i].RelativePath, files[i].Layer));
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // A file that can't be read contributes nothing.
-            }
-        });
+        var parsed = new IReadOnlyList<SpriteDefinition>[files.Count];
+        Parallel.For(0, files.Count, i => parsed[i] = ParseFile(files[i]));
+        return new SpriteCatalog(files.Select((f, i) => (f, parsed[i])).ToList());
+    }
 
-        var sprites = new Dictionary<string, SpriteDefinition>(StringComparer.OrdinalIgnoreCase);
-        foreach (var definition in parsed.SelectMany(p => p))
-            sprites[definition.Name] = definition;
-        return new SpriteCatalog(sprites);
+    /// <summary>
+    /// The catalog with one .gfx file re-read (or dropped, if it is gone) — a few milliseconds
+    /// instead of re-reading the whole game.
+    /// </summary>
+    public SpriteCatalog WithFile(GameFileSystem fileSystem, string relativePath)
+    {
+        var relative = GameFileSystem.NormalizeRelative(relativePath);
+        var files = _files.Where(f => !f.File.RelativePath.Equals(relative, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (fileSystem.Resolve(relative) is { } file)
+            files.Add((file, ParseFile(file)));
+        return new SpriteCatalog(files
+            .OrderBy(f => f.File.Layer)
+            .ThenBy(f => f.File.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .ToList());
+    }
+
+    private static IReadOnlyList<SpriteDefinition> ParseFile(VirtualFile file)
+    {
+        try
+        {
+            var text = Encoding.UTF8.GetString(File.ReadAllBytes(file.FullPath));
+            return Parse(SyntaxTree.Parse(text), file.RelativePath, file.Layer).ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return []; // A file that can't be read contributes nothing.
+        }
     }
 
     /// <summary>Sprite definitions in one parsed .gfx file.</summary>

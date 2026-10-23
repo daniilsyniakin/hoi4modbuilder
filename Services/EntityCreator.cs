@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.RegularExpressions;
 using HoI4ModBuilder.Clausewitz;
 using HoI4ModBuilder.Clausewitz.Editing;
@@ -207,19 +206,7 @@ public sealed partial class EntityCreator(ScriptWorkspace workspace, ContentInde
     }
 
     /// <summary>The mod's name (or folder) as a lower-case word for file names and default ids.</summary>
-    private string Slug()
-    {
-        foreach (var name in new[] { modName, Path.GetFileName(workspace.RootPath) })
-        {
-            var builder = new StringBuilder();
-            foreach (var c in name.ToLowerInvariant())
-                builder.Append(char.IsAsciiLetterOrDigit(c) ? c : '_');
-            var slug = builder.ToString().Trim('_');
-            if (slug.Length > 0)
-                return slug;
-        }
-        return "mod";
-    }
+    private string Slug() => ModNames.Slug(modName, workspace.RootPath);
 
     [GeneratedRegex("^[A-Z][A-Z0-9]{2}$")]
     private static partial Regex TagPattern();

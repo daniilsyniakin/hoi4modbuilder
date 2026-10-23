@@ -7,6 +7,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using AvaloniaEdit.Document;
 using AvaloniaEdit.Editing;
 using AvaloniaEdit.Indentation;
@@ -14,6 +15,7 @@ using AvaloniaEdit.Rendering;
 using HoI4ModBuilder.Clausewitz.Classification;
 using HoI4ModBuilder.Editor;
 using HoI4ModBuilder.Game.Imaging;
+using HoI4ModBuilder.Models;
 using HoI4ModBuilder.ViewModels;
 
 namespace HoI4ModBuilder.Views;
@@ -29,6 +31,8 @@ public partial class MainWindow : Window
     private ScriptColorizer? _activeColorizer;
     private string? _hoverKey;
     private GridLength _projectPanelWidth = new(280);
+    private PixelPoint _normalPosition;
+    private Size _normalSize;
 
     public MainWindow()
     {
@@ -53,6 +57,32 @@ public partial class MainWindow : Window
                 _viewModel?.OpenProblemCommand.Execute(ProblemsList.SelectedItem as ProblemRowViewModel);
         };
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
+        AddHandler(KeyUpEvent, OnWindowKeyUp, RoutingStrategies.Tunnel);
+        Deactivated += (_, _) =>
+        {
+            _viewModel?.CloseSwitcher();
+            _viewModel?.Search.Close();
+        };
+        SwitcherList.Tapped += (_, _) => _viewModel?.CommitSwitcher();
+        SearchResults.Tapped += (_, _) => _viewModel?.Search.Commit();
+        SearchBox.KeyDown += OnSearchKeyDown;
+        // A click anywhere else closes search everywhere.
+        AddHandler(PointerPressedEvent, (_, e) =>
+        {
+            if (_viewModel?.Search.IsOpen == true && !(e.Source is Visual source && SearchOverlay.IsVisualAncestorOf(source)))
+                _viewModel.Search.Close();
+        }, RoutingStrategies.Tunnel);
+        // Maximized bounds are not worth remembering: restoring should bring back the normal ones.
+        PositionChanged += (_, _) =>
+        {
+            if (WindowState == WindowState.Normal)
+                _normalPosition = Position;
+        };
+        Resized += (_, _) =>
+        {
+            if (WindowState == WindowState.Normal)
+                _normalSize = ClientSize;
+        };
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -62,6 +92,7 @@ public partial class MainWindow : Window
         {
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             _viewModel.NavigationRequested -= OnNavigationRequested;
+            _viewModel.Search.PropertyChanged -= OnSearchPropertyChanged;
         }
 
         _viewModel = DataContext as MainWindowViewModel;
@@ -69,17 +100,64 @@ public partial class MainWindow : Window
         {
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
             _viewModel.NavigationRequested += OnNavigationRequested;
+            _viewModel.Search.PropertyChanged += OnSearchPropertyChanged;
         }
 
         ShowTab(_viewModel?.ActiveTextTab);
+        if (_viewModel?.Settings.Settings.Window is { } layout)
+            ApplyLayout(layout);
         ApplyProjectPanelVisibility();
     }
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         base.OnClosing(e);
-        if (!e.Cancel)
-            _viewModel?.Dispose();
+        if (e.Cancel || _viewModel is null)
+            return;
+        if (_shownTab is not null)
+            _shownTab.SavedCaretOffset = Editor.CaretOffset;
+        _viewModel.Settings.Settings.Window = CurrentLayout();
+        _viewModel.SaveSession();
+        _viewModel.Dispose();
+    }
+
+    private void ApplyLayout(WindowLayout layout)
+    {
+        if (layout.ProjectPanelWidth >= 160)
+        {
+            _projectPanelWidth = new GridLength(layout.ProjectPanelWidth);
+            WorkspaceGrid.ColumnDefinitions[0].Width = _projectPanelWidth;
+        }
+        if (layout.Width < MinWidth || layout.Height < MinHeight)
+            return;
+        Width = layout.Width;
+        Height = layout.Height;
+        _normalSize = new Size(layout.Width, layout.Height);
+        // Only where a screen still is (a monitor may have been unplugged since).
+        var position = new PixelPoint(layout.X, layout.Y);
+        if (Screens.All.Any(screen => screen.WorkingArea.Contains(position + new PixelPoint(40, 20))))
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Position = position;
+            _normalPosition = position;
+        }
+        if (layout.Maximized)
+            WindowState = WindowState.Maximized;
+    }
+
+    private WindowLayout CurrentLayout()
+    {
+        var column = WorkspaceGrid.ColumnDefinitions[0].Width;
+        var size = _normalSize == default ? ClientSize : _normalSize;
+        return new WindowLayout
+        {
+            X = (_normalPosition == default ? Position : _normalPosition).X,
+            Y = (_normalPosition == default ? Position : _normalPosition).Y,
+            Width = size.Width,
+            Height = size.Height,
+            Maximized = WindowState == WindowState.Maximized,
+            ProjectPanelWidth = column.Value > 0 ? column.Value : _projectPanelWidth.Value,
+        };
     }
 
     private void ConfigureEditor()
@@ -280,6 +358,41 @@ public partial class MainWindow : Window
 
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
+        TrackDoubleShift(e, down: true);
+        // Alt+F7: usages of the word under the caret in the text editor, else of the selected object.
+        if (e.Key == Key.F7 && e.KeyModifiers == KeyModifiers.Alt && _viewModel is not null)
+        {
+            e.Handled = true;
+            _viewModel.FindUsages(Editor.TextArea.IsKeyboardFocusWithin ? WordAtCaret() : null);
+            return;
+        }
+        // Ctrl+Tab before the text editor, which would indent.
+        if (e.Key == Key.Tab && e.KeyModifiers.HasFlag(KeyModifiers.Control) && _viewModel is not null)
+        {
+            e.Handled = true;
+            _viewModel.MoveSwitcher(back: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+            return;
+        }
+        if (_viewModel?.IsSwitching == true)
+        {
+            e.Handled = true;
+            switch (e.Key)
+            {
+                case Key.Escape:
+                    _viewModel.CloseSwitcher();
+                    break;
+                case Key.Enter:
+                    _viewModel.CommitSwitcher();
+                    break;
+                case Key.Down or Key.Right:
+                    _viewModel.MoveSwitcher(back: false);
+                    break;
+                case Key.Up or Key.Left:
+                    _viewModel.MoveSwitcher(back: true);
+                    break;
+            }
+            return;
+        }
         if (e.Key != Key.F2 || e.KeyModifiers is not (KeyModifiers.None or KeyModifiers.Shift) || _viewModel is not { } viewModel)
             return;
         e.Handled = true;
@@ -294,6 +407,103 @@ public partial class MainWindow : Window
             _ = viewModel.RenameAsync(target.Kind, target.Id, plain);
         else
             GoToProblem(forward: plain);
+    }
+
+    private void OnSearchPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SearchEverywhereViewModel.IsOpen) && _viewModel?.Search.IsOpen == true)
+            Dispatcher.UIThread.Post(() => SearchBox.Focus(), DispatcherPriority.Loaded);
+    }
+
+    private void OnSearchKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_viewModel?.Search is not { } search)
+            return;
+        switch (e.Key)
+        {
+            case Key.Down:
+                search.Move(1);
+                break;
+            case Key.Up:
+                search.Move(-1);
+                break;
+            case Key.PageDown:
+                search.Move(10);
+                break;
+            case Key.PageUp:
+                search.Move(-10);
+                break;
+            case Key.Enter:
+                search.Commit();
+                break;
+            case Key.Escape:
+                search.Close();
+                break;
+            default:
+                return;
+        }
+        e.Handled = true;
+        if (search.Selected is { } selected)
+            SearchResults.ScrollIntoView(selected);
+    }
+
+    // Double Shift: two Shift taps with nothing pressed in between, close together.
+    private static readonly TimeSpan DoubleShiftInterval = TimeSpan.FromMilliseconds(400);
+    private bool _shiftAlone;
+    private DateTime _lastShiftTap;
+
+    private void TrackDoubleShift(KeyEventArgs e, bool down)
+    {
+        var isShift = e.Key is Key.LeftShift or Key.RightShift;
+        if (down)
+        {
+            _shiftAlone = isShift && (e.KeyModifiers & ~KeyModifiers.Shift) == 0;
+            if (!isShift)
+                _lastShiftTap = default;
+            return;
+        }
+        if (!isShift || !_shiftAlone)
+            return;
+        _shiftAlone = false;
+        var now = DateTime.UtcNow;
+        if (now - _lastShiftTap <= DoubleShiftInterval && _viewModel is not null)
+        {
+            _lastShiftTap = default;
+            _viewModel.SearchEverywhereCommand.Execute(null);
+        }
+        else
+        {
+            _lastShiftTap = now;
+        }
+    }
+
+    private void OnWindowKeyUp(object? sender, KeyEventArgs e)
+    {
+        TrackDoubleShift(e, down: false);
+        if (e.Key is Key.LeftCtrl or Key.RightCtrl && _viewModel?.IsSwitching == true)
+        {
+            e.Handled = true;
+            _viewModel.CommitSwitcher();
+        }
+    }
+
+    /// <summary>The id under the caret: letters, digits and <c>_ . : @ -</c>.</summary>
+    private string? WordAtCaret()
+    {
+        if (_shownTab is null)
+            return null;
+        var document = Editor.Document;
+        var line = document.GetLineByOffset(Editor.CaretOffset);
+        var text = document.GetText(line);
+        var column = Editor.CaretOffset - line.Offset;
+        static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c is '_' or '.' or ':' or '@' or '-';
+        var start = column;
+        while (start > 0 && IsWordChar(text[start - 1]))
+            start--;
+        var end = column;
+        while (end < text.Length && IsWordChar(text[end]))
+            end++;
+        return end > start ? text[start..end].Trim('.', ':') : null;
     }
 
     private void OnProblemsClick(object? sender, RoutedEventArgs e) => GoToProblem(forward: true);

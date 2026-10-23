@@ -43,15 +43,9 @@ public sealed class ScriptFileSyntax : SyntaxNode, IStatementContainer
 
     public SyntaxToken EndOfFile { get; }
 
-    public override IEnumerable<SyntaxElement> Children
-    {
-        get
-        {
-            foreach (var statement in Statements)
-                yield return statement;
-            yield return EndOfFile;
-        }
-    }
+    public override int ChildCount => Statements.Length + 1;
+
+    public override SyntaxElement ChildAt(int index) => index < Statements.Length ? Statements[index] : EndOfFile;
 }
 
 public abstract class StatementSyntax : SyntaxNode;
@@ -74,16 +68,14 @@ public sealed class PropertySyntax : StatementSyntax
 
     public ValueSyntax Value { get; }
 
-    public override IEnumerable<SyntaxElement> Children
+    public override int ChildCount => Operator is null ? 2 : 3;
+
+    public override SyntaxElement ChildAt(int index) => index switch
     {
-        get
-        {
-            yield return Key;
-            if (Operator is not null)
-                yield return Operator;
-            yield return Value;
-        }
-    }
+        0 => Key,
+        1 => Operator ?? (SyntaxElement)Value,
+        _ => Value,
+    };
 }
 
 /// <summary>A value standing on its own inside a block, e.g. each tag in <c>{ GER ENG }</c>.</summary>
@@ -95,10 +87,9 @@ public sealed class ElementSyntax : StatementSyntax
 
     public ValueSyntax Value { get; }
 
-    public override IEnumerable<SyntaxElement> Children
-    {
-        get { yield return Value; }
-    }
+    public override int ChildCount => 1;
+
+    public override SyntaxElement ChildAt(int index) => Value;
 }
 
 /// <summary>Tokens the parser couldn't place, such as a stray <c>}</c>. A diagnostic is reported for them.</summary>
@@ -115,7 +106,9 @@ public sealed class SkippedTokensSyntax : StatementSyntax
 
     public ImmutableArray<SyntaxToken> Tokens { get; }
 
-    public override IEnumerable<SyntaxElement> Children => Tokens;
+    public override int ChildCount => Tokens.Length;
+
+    public override SyntaxElement ChildAt(int index) => Tokens[index];
 }
 
 public abstract class ValueSyntax : SyntaxNode;
@@ -134,10 +127,9 @@ public sealed class ScalarSyntax : ValueSyntax
     /// <summary>The value with quotes removed and <c>\"</c>, <c>\\</c> unescaped.</summary>
     public string ValueText => IsQuoted ? Unquote(Token.Text) : Token.Text;
 
-    public override IEnumerable<SyntaxElement> Children
-    {
-        get { yield return Token; }
-    }
+    public override int ChildCount => 1;
+
+    public override SyntaxElement ChildAt(int index) => Token;
 
     private static string Unquote(string text)
     {
@@ -185,16 +177,10 @@ public sealed class BlockSyntax : ValueSyntax, IStatementContainer
 
     public SyntaxToken CloseBrace { get; }
 
-    public override IEnumerable<SyntaxElement> Children
-    {
-        get
-        {
-            yield return OpenBrace;
-            foreach (var statement in Statements)
-                yield return statement;
-            yield return CloseBrace;
-        }
-    }
+    public override int ChildCount => Statements.Length + 2;
+
+    public override SyntaxElement ChildAt(int index) =>
+        index == 0 ? OpenBrace : index <= Statements.Length ? Statements[index - 1] : CloseBrace;
 }
 
 /// <summary>A block prefixed by a word on the same line, e.g. <c>color = rgb { 255 0 0 }</c>.</summary>
@@ -212,12 +198,7 @@ public sealed class TaggedBlockSyntax : ValueSyntax
 
     public BlockSyntax Block { get; }
 
-    public override IEnumerable<SyntaxElement> Children
-    {
-        get
-        {
-            yield return Tag;
-            yield return Block;
-        }
-    }
+    public override int ChildCount => 2;
+
+    public override SyntaxElement ChildAt(int index) => index == 0 ? Tag : Block;
 }

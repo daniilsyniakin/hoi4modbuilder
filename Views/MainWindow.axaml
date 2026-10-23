@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui"
+<Window Icon="avares://HoI4ModBuilder/Assets/app.png" xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:HoI4ModBuilder.ViewModels"
         xmlns:conv="using:HoI4ModBuilder.Views.Converters"
@@ -37,6 +37,9 @@
     <KeyBinding Gesture="Ctrl+Alt+S" Command="{Binding OpenSettingsCommand}" />
     <KeyBinding Gesture="Alt+D1" Command="{Binding ToggleProjectPanelCommand}" />
     <KeyBinding Gesture="Alt+D6" Command="{Binding ToggleProblemsPanelCommand}" />
+    <KeyBinding Gesture="Alt+D4" Command="{Binding ToggleGameLogCommand}" />
+    <KeyBinding Gesture="Shift+F10" Command="{Binding RunGameCommand}" />
+    <KeyBinding Gesture="Ctrl+F2" Command="{Binding StopGameCommand}" />
     <!-- Text editors and text boxes handle these first, with their own undo. -->
     <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
@@ -45,10 +48,22 @@
     <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveAllCommand}" />
   </Window.KeyBindings>
 
+  <Panel>
   <DockPanel>
 
     <!-- Menu bar -->
     <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,0,0,1">
+      <Grid ColumnDefinitions="*,Auto">
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" Margin="0,0,8,0" VerticalAlignment="Center">
+        <Button Classes="flat" Padding="7,4" MinHeight="0" Command="{Binding RunGameCommand}"
+                ToolTip.Tip="Запустити гру з модом (Shift+F10)">
+          <PathIcon Data="{StaticResource IconPlay}" Width="12" Height="12" Foreground="{DynamicResource SuccessBrush}" />
+        </Button>
+        <Button Classes="flat" Padding="7,4" MinHeight="0" Command="{Binding StopGameCommand}"
+                ToolTip.Tip="Зупинити гру (Ctrl+F2)">
+          <PathIcon Data="{StaticResource IconStop}" Width="11" Height="11" Foreground="{DynamicResource ErrorBrush}" />
+        </Button>
+      </StackPanel>
       <Menu Classes="main">
         <MenuItem Header="_Файл">
           <MenuItem Header="_Новий мод…" Command="{Binding NewModCommand}"
@@ -80,6 +95,23 @@
         <MenuItem Header="_Правка">
           <MenuItem Header="{Binding UndoHeader}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
           <MenuItem Header="{Binding RedoHeader}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Shift+Z" />
+          <Separator />
+          <MenuItem Header="Знайти використання" Command="{Binding FindUsagesCommand}" InputGesture="Alt+F7" />
+          <MenuItem Header="Пошук усюди" Command="{Binding SearchEverywhereCommand}" />
+        </MenuItem>
+        <MenuItem Header="_Запуск">
+          <MenuItem Header="Запустити гру з модом" Command="{Binding RunGameCommand}" InputGesture="Shift+F10">
+            <MenuItem.Icon>
+              <PathIcon Data="{StaticResource IconPlay}" Width="11" Height="11" Foreground="{DynamicResource SuccessBrush}" />
+            </MenuItem.Icon>
+          </MenuItem>
+          <MenuItem Header="Зупинити гру" Command="{Binding StopGameCommand}" InputGesture="Ctrl+F2">
+            <MenuItem.Icon>
+              <PathIcon Data="{StaticResource IconStop}" Width="10" Height="10" Foreground="{DynamicResource ErrorBrush}" />
+            </MenuItem.Icon>
+          </MenuItem>
+          <Separator />
+          <MenuItem Header="Лог гри" Command="{Binding ToggleGameLogCommand}" InputGesture="Alt+4" />
         </MenuItem>
         <MenuItem Header="_Довідка">
           <MenuItem Header="Перевірити оновлення" Command="{Binding CheckUpdatesCommand}" />
@@ -95,8 +127,25 @@
                     IsChecked="{Binding IsProblemsPanelVisible, Mode=OneWay}"
                     Command="{Binding ToggleProblemsPanelCommand}"
                     InputGesture="Alt+6" />
+          <Separator />
+          <MenuItem Header="Локалізація" Command="{Binding OpenLocalisationTableCommand}">
+            <MenuItem.Icon>
+              <PathIcon Data="{StaticResource IconLocalisation}" Width="12" Height="12" />
+            </MenuItem.Icon>
+          </MenuItem>
+          <MenuItem Header="Технології" Command="{Binding OpenTechnologiesCommand}">
+            <MenuItem.Icon>
+              <PathIcon Data="{StaticResource IconTechnology}" Width="12" Height="12" />
+            </MenuItem.Icon>
+          </MenuItem>
+          <MenuItem Header="Карта" Command="{Binding OpenMapCommand}">
+            <MenuItem.Icon>
+              <PathIcon Data="{StaticResource IconState}" Width="12" Height="12" />
+            </MenuItem.Icon>
+          </MenuItem>
         </MenuItem>
       </Menu>
+      </Grid>
     </Border>
 
     <!-- Status bar -->
@@ -304,6 +353,11 @@
                     </MenuItem.Icon>
                   </MenuItem>
                   <Separator />
+                  <MenuItem Header="Знайти використання" InputGesture="Alt+F7"
+                            Command="{Binding FindUsagesCommand}"
+                            CommandParameter="{Binding ProjectTree.SelectedContentNode.Name, FallbackValue={x:Null}}"
+                            IsEnabled="{Binding ProjectTree.SelectedContentNode.HasLocation, FallbackValue=False}" />
+                  <Separator />
                   <MenuItem Header="Перейменувати…" InputGesture="F2"
                             Command="{Binding RenameContentNodeCommand}"
                             CommandParameter="{Binding ProjectTree.SelectedContentNode}"
@@ -383,26 +437,46 @@
           </ListBox>
         </Border>
 
-        <!-- Problems tool window (Alt+6) -->
-        <Border DockPanel.Dock="Bottom" Height="220" IsVisible="{Binding IsProblemsPanelVisible}"
+        <!-- Bottom tool window: problems (Alt+6) and the game log (Alt+4) -->
+        <Border DockPanel.Dock="Bottom" Height="260" IsVisible="{Binding IsProblemsPanelVisible}"
                 Background="{DynamicResource PanelBgBrush}"
                 BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,1,0,0">
           <DockPanel>
-            <Grid DockPanel.Dock="Top" Height="32" Margin="10,0,6,0" ColumnDefinitions="Auto,*,Auto">
-              <TextBlock Classes="tool-title" Text="Проблеми" VerticalAlignment="Center" />
-              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0" VerticalAlignment="Center">
-                <PathIcon Data="{StaticResource IconError}" Width="11" Height="11" Foreground="{DynamicResource ErrorBrush}" />
-                <TextBlock Text="{Binding ErrorCount}" Classes="secondary" />
-                <PathIcon Data="{StaticResource IconWarning}" Width="11" Height="11" Foreground="{DynamicResource WarningBrush}"
-                          Margin="6,0,0,0" />
-                <TextBlock Text="{Binding WarningCount}" Classes="secondary" />
-              </StackPanel>
-              <Button Grid.Column="2" Classes="flat" Padding="5" MinHeight="0" Command="{Binding ToggleProblemsPanelCommand}"
-                      ToolTip.Tip="Сховати (Alt+6)">
+            <Grid DockPanel.Dock="Top" Height="32" Margin="6,0,6,0" ColumnDefinitions="Auto,Auto,Auto,*,Auto">
+              <Button Classes="flat bottom-tab" Classes.active="{Binding IsProblemsTab}" Padding="8,4" MinHeight="0"
+                      Command="{Binding ShowProblemsTabCommand}" ToolTip.Tip="Alt+6">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <TextBlock Text="Проблеми" />
+                  <PathIcon Data="{StaticResource IconError}" Width="11" Height="11" Foreground="{DynamicResource ErrorBrush}" Margin="4,0,0,0" />
+                  <TextBlock Text="{Binding ErrorCount}" Classes="secondary" />
+                  <PathIcon Data="{StaticResource IconWarning}" Width="11" Height="11" Foreground="{DynamicResource WarningBrush}" Margin="4,0,0,0" />
+                  <TextBlock Text="{Binding WarningCount}" Classes="secondary" />
+                </StackPanel>
+              </Button>
+              <Button Grid.Column="1" Classes="flat bottom-tab" Classes.active="{Binding IsGameLogTab}" Padding="8,4" MinHeight="0"
+                      Command="{Binding ShowGameLogTabCommand}" ToolTip.Tip="Alt+4">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="Лог гри" />
+                  <TextBlock Text="{Binding GameLog.ModCount}" Classes="secondary" ToolTip.Tip="Про цей мод" />
+                </StackPanel>
+              </Button>
+              <Button Grid.Column="2" Classes="flat bottom-tab" Classes.active="{Binding IsUsagesTab}" Padding="8,4" MinHeight="0"
+                      Command="{Binding ShowUsagesTabCommand}" IsVisible="{Binding Usages.HasTarget}" ToolTip.Tip="Alt+F7">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="Використання" />
+                  <TextBlock Text="{Binding Usages.Target}" FontFamily="{StaticResource EditorFont}" FontSize="12" />
+                  <TextBlock Text="{Binding Usages.Count}" Classes="secondary" />
+                </StackPanel>
+              </Button>
+              <Button Grid.Column="4" Classes="flat" Padding="5" MinHeight="0" Command="{Binding HideBottomPanelCommand}"
+                      ToolTip.Tip="Сховати">
                 <PathIcon Data="{StaticResource IconMinus}" Width="13" Height="13" />
               </Button>
             </Grid>
-            <ListBox x:Name="ProblemsList" Classes="dense" ItemsSource="{Binding ProblemRows}" Background="Transparent">
+            <Panel>
+            <views:GameLogView DataContext="{Binding GameLog}" IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsGameLogTab}" />
+            <views:UsagesView DataContext="{Binding Usages}" IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsUsagesTab}" />
+            <ListBox x:Name="ProblemsList" IsVisible="{Binding IsProblemsTab}" Classes="dense" ItemsSource="{Binding ProblemRows}" Background="Transparent">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:ProblemRowViewModel">
                   <Grid ColumnDefinitions="Auto,*,Auto,Auto" Height="22" Background="Transparent">
@@ -422,6 +496,7 @@
                 </DataTemplate>
               </ListBox.ItemTemplate>
             </ListBox>
+            </Panel>
           </DockPanel>
         </Border>
 
@@ -454,6 +529,21 @@
             </ContentControl.DataTemplates>
           </ContentControl>
 
+          <!-- Databases over the whole mod -->
+          <ContentControl Content="{Binding ActiveToolTab}" IsVisible="{Binding HasActiveToolTab}">
+            <ContentControl.DataTemplates>
+              <DataTemplate DataType="vm:LocalisationTableTabViewModel">
+                <views:LocalisationTableView />
+              </DataTemplate>
+              <DataTemplate DataType="vm:TechnologyDatabaseTabViewModel">
+                <views:TechnologyDatabaseView />
+              </DataTemplate>
+              <DataTemplate DataType="vm:MapTabViewModel">
+                <views:MapView />
+              </DataTemplate>
+            </ContentControl.DataTemplates>
+          </ContentControl>
+
           <!-- Empty editor: shortcut hints, as in JetBrains IDEs -->
           <Grid IsVisible="{Binding !HasActiveTab}" HorizontalAlignment="Center" VerticalAlignment="Center"
                 ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto,Auto">
@@ -478,4 +568,70 @@
       </DockPanel>
     </Grid>
   </DockPanel>
+
+  <!-- Search everywhere (double Shift) -->
+  <Border x:Name="SearchOverlay" IsVisible="{Binding Search.IsOpen}" HorizontalAlignment="Center" VerticalAlignment="Top"
+          Margin="0,70,0,0" Width="640" Padding="8" CornerRadius="8" BorderThickness="1"
+          Background="{DynamicResource PanelBgBrush}" BorderBrush="{DynamicResource SeparatorBrush}"
+          BoxShadow="0 10 32 0 #A0000000">
+    <DockPanel>
+      <TextBox x:Name="SearchBox" DockPanel.Dock="Top" Text="{Binding Search.Query}" PlaceholderText="Пошук усюди"
+               MinHeight="0" Padding="10,6" FontSize="14" />
+      <ListBox x:Name="SearchResults" ItemsSource="{Binding Search.Results}" SelectedItem="{Binding Search.Selected}"
+               MaxHeight="440" Margin="0,6,0,0" Background="Transparent" Focusable="False"
+               IsVisible="{Binding Search.HasResults}">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:SearchResultViewModel">
+            <Grid ColumnDefinitions="Auto,*,Auto" Margin="2,1">
+              <Panel Width="14" Margin="0,0,8,0" VerticalAlignment="Center">
+                <PathIcon Width="12" Height="12" IsVisible="{Binding IsContent}"
+                          Data="{Binding ContentKind, Converter={x:Static conv:ContentIcons.Geometry}}"
+                          Foreground="{Binding ContentKind, Converter={x:Static conv:ContentIcons.Brush}}" />
+                <PathIcon Width="12" Height="12" IsVisible="{Binding IsFile}"
+                          Data="{Binding FileKind, Converter={x:Static conv:FileIcons.Geometry}}"
+                          Foreground="{Binding FileKind, Converter={x:Static conv:FileIcons.Brush}}" />
+                <PathIcon Width="12" Height="12" IsVisible="{Binding IsLocalisation}" Data="{StaticResource IconLocalisation}" />
+                <PathIcon Width="11" Height="11" IsVisible="{Binding IsAction}" Data="{StaticResource IconPlay}"
+                          Foreground="{DynamicResource AccentHoverBrush}" />
+              </Panel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Subtitle}" Classes="secondary" FontSize="11" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" MaxWidth="380" />
+              </StackPanel>
+              <TextBlock Grid.Column="2" Text="{Binding Category}" Classes="secondary" FontSize="11" VerticalAlignment="Center"
+                         Margin="8,0,0,0" />
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </DockPanel>
+  </Border>
+
+  <!-- Ctrl+Tab: tabs by last use -->
+  <Border IsVisible="{Binding IsSwitcherVisible}" HorizontalAlignment="Center" VerticalAlignment="Center"
+          MinWidth="380" MaxWidth="640" MaxHeight="520" Padding="6" CornerRadius="8" BorderThickness="1"
+          Background="{DynamicResource PanelBgBrush}" BorderBrush="{DynamicResource SeparatorBrush}"
+          BoxShadow="0 10 32 0 #A0000000">
+    <ListBox x:Name="SwitcherList" ItemsSource="{Binding SwitcherTabs}" SelectedItem="{Binding SwitcherSelection}"
+             Focusable="False" Background="Transparent">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:DocumentTabViewModel">
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="2,1">
+            <Panel Width="14" VerticalAlignment="Center">
+              <PathIcon Width="13" Height="13" IsVisible="{Binding !IsEntity}"
+                        Data="{Binding Kind, Converter={x:Static conv:FileIcons.Geometry}}"
+                        Foreground="{Binding Kind, Converter={x:Static conv:FileIcons.Brush}}" />
+              <PathIcon Width="13" Height="13" IsVisible="{Binding IsEntity}"
+                        Data="{Binding EntityKind, Converter={x:Static conv:ContentIcons.Geometry}}"
+                        Foreground="{Binding EntityKind, Converter={x:Static conv:ContentIcons.Brush}}" />
+            </Panel>
+            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding Folder}" Classes="secondary" FontSize="11" VerticalAlignment="Center" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </Border>
+  </Panel>
 </Window>

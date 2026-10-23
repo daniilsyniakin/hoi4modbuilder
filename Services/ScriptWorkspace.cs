@@ -87,6 +87,23 @@ public sealed class ScriptWorkspace(string rootPath, Func<string, EditorTabViewM
         return null;
     }
 
+    /// <summary>Creates a binary file (a texture), recorded so that undo removes it again.</summary>
+    public string? CreateBinaryFile(string path, byte[] bytes)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, bytes);
+            History.Record(new FileChange(Paths.Normalize(path), 0, "", "", true, 0, 0, 0, 0) { Bytes = bytes });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return $"Не вдалося створити {Path.GetFileName(path)}: {ex.Message}";
+        }
+        NotifyChanged(path);
+        return null;
+    }
+
     /// <summary>Undoes the last action, if the files are still as it left them.</summary>
     /// <returns>An error message, or null.</returns>
     public string? Undo() => Replay(History.PeekUndo(), undo: true);
@@ -104,6 +121,16 @@ public sealed class ScriptWorkspace(string rootPath, Func<string, EditorTabViewM
         var current = new Dictionary<string, string?>(Paths.Comparer);
         foreach (var path in entry.Changes.Select(c => c.Path).Distinct(Paths.Comparer))
         {
+            // A created binary file (a texture): undo needs it there, redo needs it gone.
+            if (entry.Changes.FirstOrDefault(c => c.Bytes is not null && Paths.AreEqual(c.Path, path)) is not null)
+            {
+                if (File.Exists(path) != undo)
+                {
+                    History.Discard(entry, undo);
+                    return $"Не вдалося {(undo ? "скасувати" : "повторити")} «{entry.Description}»: файл {Path.GetFileName(path)} змінено після цієї дії.";
+                }
+                continue;
+            }
             var text = File.Exists(path) || findOpenTab(path) is not null ? ReadText(path) : null;
             current[path] = text;
             // Undo starts from the file's last change in the action, redo from its first.
@@ -123,7 +150,7 @@ public sealed class ScriptWorkspace(string rootPath, Func<string, EditorTabViewM
             var ordered = undo ? entry.Changes.AsEnumerable().Reverse() : entry.Changes;
             foreach (var change in ordered)
             {
-                var text = current[change.Path];
+                var text = current.GetValueOrDefault(change.Path);
                 if (undo && change.Created)
                 {
                     Delete(change.Path);
@@ -131,7 +158,10 @@ public sealed class ScriptWorkspace(string rootPath, Func<string, EditorTabViewM
                 }
                 else if (!undo && change.Created)
                 {
-                    WriteNew(change.Path, change.NewText, change.ByteOrderMark);
+                    if (change.Bytes is { } bytes)
+                        File.WriteAllBytes(change.Path, bytes);
+                    else
+                        WriteNew(change.Path, change.NewText, change.ByteOrderMark);
                     current[change.Path] = change.NewText;
                 }
                 else
@@ -214,6 +244,9 @@ public sealed record FileChange(string Path, int Start, string OldText, string N
     int HashBefore, int LengthBefore, int HashAfter, int LengthAfter)
 {
     public bool ByteOrderMark { get; init; }
+
+    /// <summary>Content of a created binary file (a texture), to write it back on redo.</summary>
+    public byte[]? Bytes { get; init; }
 
     public static FileChange Between(string path, string before, string after, bool created)
     {

@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HoI4ModBuilder.ViewModels"
+             x:Class="HoI4ModBuilder.Views.TechnologyDatabaseView"
+             x:DataType="vm:TechnologyDatabaseTabViewModel">
+  <UserControl.Styles>
+    <Style Selector="ToggleButton.filter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="8,3" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ToggleButton.filter:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource PressedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    </Style>
+    <Style Selector="ListBox.table ListBoxItem">
+      <Setter Property="Padding" Value="8,3" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="TextBlock.cell">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="Border.mod-tag">
+      <Setter Property="Background" Value="#223574F0" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Padding" Value="4,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <Grid DockPanel.Dock="Top" Height="38" Margin="10,0" ColumnDefinitions="Auto,Auto,Auto,*">
+      <TextBox Text="{Binding Search}" PlaceholderText="Пошук" Width="260" MinHeight="0" Padding="8,3" VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" Margin="8,0,0,0" VerticalAlignment="Center">
+        <ToggleButton Classes="filter" IsChecked="{Binding ShowMod}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="Мод" />
+            <TextBlock Text="{Binding ModCount}" Classes="secondary" />
+          </StackPanel>
+        </ToggleButton>
+        <ToggleButton Classes="filter" IsChecked="{Binding ShowGame}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="Гра" />
+            <TextBlock Text="{Binding GameCount}" Classes="secondary" />
+          </StackPanel>
+        </ToggleButton>
+      </StackPanel>
+      <ComboBox Grid.Column="2" ItemsSource="{Binding Folders}" SelectedItem="{Binding SelectedFolder}" MinWidth="200"
+                Margin="8,0,0,0" VerticalAlignment="Center" MinHeight="0" Padding="8,3" />
+    </Grid>
+
+    <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,1">
+      <Grid ColumnDefinitions="52,2*,1.3*,60,60,1.2*,1.5*,44" Margin="8,0" Height="28">
+        <TextBlock Grid.Column="1" Text="Назва" Classes="secondary cell" />
+        <TextBlock Grid.Column="2" Text="Ідентифікатор" Classes="secondary cell" />
+        <TextBlock Grid.Column="3" Text="Рік" Classes="secondary cell" />
+        <TextBlock Grid.Column="4" Text="Днів" Classes="secondary cell" />
+        <TextBlock Grid.Column="5" Text="Тека" Classes="secondary cell" />
+        <TextBlock Grid.Column="6" Text="Категорії" Classes="secondary cell" />
+      </Grid>
+    </Border>
+
+    <Panel>
+      <ListBox x:Name="Table" Classes="table" ItemsSource="{Binding Rows}" Background="Transparent">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:TechnologyRowViewModel">
+            <Grid ColumnDefinitions="52,2*,1.3*,60,60,1.2*,1.5*,44" Background="Transparent" ToolTip.Tip="{Binding Details}">
+              <Grid.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="Копіювати ідентифікатор" Click="OnCopyId" />
+                  <MenuItem Header="Відкрити" IsVisible="{Binding IsMod}"
+                            Command="{Binding $parent[UserControl].((vm:TechnologyDatabaseTabViewModel)DataContext).OpenCommand}"
+                            CommandParameter="{Binding}" />
+                </ContextMenu>
+              </Grid.ContextMenu>
+              <Image Source="{Binding Icon}" Width="44" Height="34" Stretch="Uniform" HorizontalAlignment="Left" />
+              <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="cell" Margin="0,0,8,0" />
+              <TextBlock Grid.Column="2" Text="{Binding Id}" Classes="cell secondary" FontFamily="{StaticResource EditorFont}" Margin="0,0,8,0" />
+              <TextBlock Grid.Column="3" Text="{Binding YearText}" Classes="cell" />
+              <TextBlock Grid.Column="4" Text="{Binding DaysText}" Classes="cell" />
+              <TextBlock Grid.Column="5" Text="{Binding Folder}" Classes="cell secondary" Margin="0,0,8,0" />
+              <TextBlock Grid.Column="6" Text="{Binding Categories}" Classes="cell secondary" Margin="0,0,8,0" />
+              <Border Grid.Column="7" Classes="mod-tag" IsVisible="{Binding IsMod}">
+                <TextBlock Text="мод" FontSize="11" Foreground="{DynamicResource AccentHoverBrush}" />
+              </Border>
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+      <TextBlock Text="Технологій немає" Classes="secondary" HorizontalAlignment="Center" VerticalAlignment="Center"
+                 IsVisible="{Binding IsEmpty}" />
+      <TextBlock Text="Читання технологій…" Classes="secondary" HorizontalAlignment="Center" VerticalAlignment="Center"
+                 IsVisible="{Binding IsLoading}" />
+    </Panel>
+  </DockPanel>
+</UserControl>

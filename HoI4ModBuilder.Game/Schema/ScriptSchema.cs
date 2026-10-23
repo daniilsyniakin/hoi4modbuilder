@@ -184,8 +184,9 @@ public sealed partial class ScriptSchema
     /// <summary>
     /// The script text a newly added command starts with: the documented required fields for
     /// block commands (<c>{ ideology = neutrality popularity = 0.05 }</c>), a sample value otherwise.
+    /// Null when the documentation shows no example (<c>has_tech</c>): the value is better taken from scripts.
     /// </summary>
-    public string Template(ScriptCommand command)
+    public string? Template(ScriptCommand command)
     {
         if (command.Shape == ValueShape.Block)
         {
@@ -201,7 +202,7 @@ public sealed partial class ScriptSchema
             ValueShape.Number => command.Sample ?? "0",
             ValueShape.Bool => "yes",
             ValueShape.Text when command.Sample is { } sample => ScriptEdits.FormatValue(sample),
-            _ => "yes",
+            _ => null,
         };
     }
 

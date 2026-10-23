@@ -1,0 +1,230 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HoI4ModBuilder.ViewModels"
+             xmlns:graph="using:HoI4ModBuilder.Views.Graph"
+             xmlns:conv="using:HoI4ModBuilder.Views.Converters"
+             xmlns:entv="using:HoI4ModBuilder.Views.Entities"
+             x:Class="HoI4ModBuilder.Views.MapView"
+             x:DataType="vm:MapTabViewModel">
+  <UserControl.Styles>
+    <Style Selector="ToggleButton.mode">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="ToggleButton.mode:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource PressedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    </Style>
+    <Style Selector="graph|GraphSurface.picking">
+      <Setter Property="Cursor" Value="Cross" />
+    </Style>
+    <Style Selector="TextBlock.caption">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="Margin" Value="0,10,0,3" />
+    </Style>
+    <Style Selector="TextBlock.value">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.link:pointerover TextBlock">
+      <Setter Property="TextDecorations" Value="Underline" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid ColumnDefinitions="*,1,340">
+    <DockPanel>
+      <!-- Modes -->
+      <Border DockPanel.Dock="Top" Height="36" Padding="8,0"
+              BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,0,0,1">
+        <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+          <ToggleButton Classes="mode" Content="Власники" IsChecked="{Binding IsOwners, Mode=OneWay}"
+                        Command="{Binding ShowModeCommand}" CommandParameter="{x:Static vm:MapMode.Owners}" />
+          <ToggleButton Classes="mode" Content="Ядра й претензії" IsChecked="{Binding IsCores, Mode=OneWay}"
+                        Command="{Binding ShowModeCommand}" CommandParameter="{x:Static vm:MapMode.Cores}" />
+          <ToggleButton Classes="mode" Content="Будівлі" IsChecked="{Binding IsBuildings, Mode=OneWay}"
+                        Command="{Binding ShowModeCommand}" CommandParameter="{x:Static vm:MapMode.Buildings}" />
+          <ToggleButton Classes="mode" Content="Ресурси" IsChecked="{Binding IsResources, Mode=OneWay}"
+                        Command="{Binding ShowModeCommand}" CommandParameter="{x:Static vm:MapMode.Resources}" />
+          <ToggleButton Classes="mode" Content="Стратегічні регіони" IsChecked="{Binding IsRegions, Mode=OneWay}"
+                        Command="{Binding ShowModeCommand}" CommandParameter="{x:Static vm:MapMode.Regions}" />
+          <Border Width="1" Height="16" Margin="6,0" Background="{DynamicResource SeparatorBrush}" />
+          <ToggleButton Classes="mode" IsChecked="{Binding IsMod, Mode=OneWay}"
+                        Command="{Binding ShowModeCommand}" CommandParameter="{x:Static vm:MapMode.Mod}">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <PathIcon Data="{StaticResource IconScript}" Width="11" Height="11" />
+              <TextBlock Text="Що робить мод" />
+            </StackPanel>
+          </ToggleButton>
+        </StackPanel>
+      </Border>
+
+      <Panel>
+        <graph:GraphSurface x:Name="Surface" Background="{DynamicResource WindowBgBrush}"
+                            ViewTransform="{Binding ViewTransform}" Classes.picking="{Binding IsPicking}">
+          <Canvas x:Name="World" Width="{Binding MapWidth}" Height="{Binding MapHeight}">
+            <Image Source="{Binding Picture}" Width="{Binding MapWidth}" Height="{Binding MapHeight}"
+                   RenderOptions.BitmapInterpolationMode="None" />
+          </Canvas>
+        </graph:GraphSurface>
+
+        <graph:GraphMinimap Surface="{Binding #Surface}" Picture="{Binding Picture}"
+                            WorldWidth="{Binding MapWidth}" WorldHeight="{Binding MapHeight}"
+                            HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12" />
+
+        <!-- What is under the pointer -->
+        <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10" Padding="8,4" CornerRadius="4"
+                Background="#E6202226" IsHitTestVisible="False"
+                IsVisible="{Binding HoverText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Text="{Binding HoverText}" FontSize="12" />
+        </Border>
+
+        <TextBlock Text="Читання карти…" Classes="secondary" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   IsVisible="{Binding IsLoading}" />
+        <TextBlock Text="{Binding Error}" Classes="secondary" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   TextWrapping="Wrap" MaxWidth="480" TextAlignment="Center"
+                   IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      </Panel>
+    </DockPanel>
+
+    <Border Grid.Column="1" Background="{DynamicResource SeparatorBrush}" />
+
+    <ScrollViewer Grid.Column="2" Background="{DynamicResource PanelBgBrush}">
+      <StackPanel Margin="14,10">
+        <!-- Mode settings -->
+        <StackPanel IsVisible="{Binding IsCores}">
+          <TextBlock Text="Країна" Classes="caption" Margin="0,0,0,3" />
+          <AutoCompleteBox Text="{Binding Country}" ItemsSource="{Binding Countries}" FilterMode="StartsWith"
+                           MinimumPrefixLength="0" />
+        </StackPanel>
+        <StackPanel IsVisible="{Binding IsMod}">
+          <TextBlock Text="Чиї дії показати" Classes="caption" Margin="0,0,0,3" />
+          <ComboBox ItemsSource="{Binding Filters}" SelectedItem="{Binding Filter}" HorizontalAlignment="Stretch" />
+        </StackPanel>
+
+        <ItemsControl ItemsSource="{Binding Legend}" Margin="0,8,0,0">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:MapLegendItem">
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                <Border Width="14" Height="10" CornerRadius="2" Background="{Binding Brush}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Text}" FontSize="12" VerticalAlignment="Center" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- The selected state -->
+        <StackPanel DataContext="{Binding Selected}" x:DataType="vm:MapStateViewModel"
+                    IsVisible="{Binding $parent[UserControl].((vm:MapTabViewModel)DataContext).Selected, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}">
+          <Border Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,12,0,6" />
+          <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding IdText}" Classes="secondary" FontSize="11" />
+
+          <StackPanel IsVisible="{Binding !$parent[UserControl].((vm:MapTabViewModel)DataContext).HasEditor, FallbackValue=True}">
+            <TextBlock Text="Власник" Classes="caption" />
+            <TextBlock Text="{Binding Owner}" Classes="value" />
+            <TextBlock Text="Ядра" Classes="caption" />
+            <TextBlock Text="{Binding Cores}" Classes="value" />
+            <TextBlock Text="Претензії" Classes="caption" />
+            <TextBlock Text="{Binding Claims}" Classes="value" />
+            <TextBlock Text="Категорія · людські ресурси" Classes="caption" />
+            <TextBlock Classes="value">
+              <Run Text="{Binding Category}" />
+              <Run Text=" · " />
+              <Run Text="{Binding Manpower}" />
+            </TextBlock>
+          </StackPanel>
+
+          <!-- What the mod does with it -->
+          <StackPanel IsVisible="{Binding HasReferences}">
+            <TextBlock Text="Що робить мод" Classes="caption" />
+            <ItemsControl ItemsSource="{Binding References}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:MapReferenceViewModel">
+                  <StackPanel Margin="0,2,0,6">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Border Width="8" Height="8" CornerRadius="4" Background="{Binding ActionBrush}" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding Action}" FontSize="11" Classes="secondary" />
+                    </StackPanel>
+                    <Grid ColumnDefinitions="*,Auto" Margin="14,1,0,0">
+                      <Button Classes="link" Command="{Binding Open}" HorizontalAlignment="Left">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                          <PathIcon Width="11" Height="11"
+                                    Data="{Binding OwnerKind, Converter={x:Static conv:ContentIcons.Geometry}}"
+                                    Foreground="{Binding OwnerKind, Converter={x:Static conv:ContentIcons.Brush}}" />
+                          <TextBlock Text="{Binding Owner}" FontSize="12" Foreground="{DynamicResource AccentHoverBrush}"
+                                     TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                        </StackPanel>
+                      </Button>
+                      <Button Grid.Column="1" Classes="link" Command="{Binding OpenCode}">
+                        <TextBlock Text="{Binding LineText}" FontSize="11" Classes="secondary" />
+                      </Button>
+                    </Grid>
+                    <TextBlock Text="{Binding Context}" FontSize="11" Classes="secondary" Margin="14,0,0,0" TextWrapping="Wrap" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+
+          <StackPanel IsVisible="{Binding !$parent[UserControl].((vm:MapTabViewModel)DataContext).HasEditor, FallbackValue=True}">
+          <TextBlock Text="Будівлі" Classes="caption" IsVisible="{Binding HasBuildings}" />
+          <ItemsControl ItemsSource="{Binding Buildings}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding}" Classes="value" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="Ресурси" Classes="caption" IsVisible="{Binding HasResources}" />
+          <ItemsControl ItemsSource="{Binding Resources}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding}" Classes="value" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="Переможні очки" Classes="caption" IsVisible="{Binding HasVictoryPoints}" />
+          <ItemsControl ItemsSource="{Binding VictoryPoints}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding}" Classes="value" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Text="Файл" Classes="caption" />
+          <TextBlock Text="{Binding File}" Classes="value secondary" FontSize="11" />
+          <!-- A game state: copied into the mod to be changed -->
+          <Button Classes="flat" Padding="8,4" MinHeight="0" HorizontalAlignment="Left" Margin="0,6,0,0"
+                  Command="{Binding $parent[UserControl].((vm:MapTabViewModel)DataContext).CopyToModCommand}"
+                  IsVisible="{Binding !IsMod}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconPlus}" Width="11" Height="11" />
+              <TextBlock Text="Перенести в мод" />
+            </StackPanel>
+          </Button>
+          </StackPanel>
+        </StackPanel>
+
+        <!-- The mod's state: edited here -->
+        <Panel IsVisible="{Binding HasEditor}" Margin="-14,6,-14,0">
+          <entv:PropertyPanel DataContext="{Binding StateEditor.Panel}" />
+        </Panel>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

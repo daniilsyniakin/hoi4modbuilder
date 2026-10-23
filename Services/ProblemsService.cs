@@ -25,8 +25,9 @@ public sealed class ProblemsService
     private ScriptVocabulary? _gameVocabulary;
     private int _generation;
 
-    public ProblemsService(ScriptWorkspace workspace, ContentIndex content, GameAssets assets, LocalisationService localisation)
+    public ProblemsService(ScriptWorkspace workspace, ContentIndex content, GameAssets assets, LocalisationService localisation, MapService map)
     {
+        _map = map;
         _workspace = workspace;
         _content = content;
         _assets = assets;
@@ -42,7 +43,16 @@ public sealed class ProblemsService
         content.Changed += (_, _) => Schedule();
         localisation.Changed += (_, _) => Schedule();
         assets.SpritesChanged += (_, _) => Schedule();
+        map.Changed += (_, _) =>
+        {
+            // States and countries matter for the checks; the bitmap and the references don't.
+            if (_map.Data != _checkedMapData)
+                Schedule();
+        };
     }
+
+    private readonly MapService _map;
+    private Game.Map.MapData? _checkedMapData;
 
     /// <summary>The game's documented effects, triggers and modifiers; empty until loaded.</summary>
     public ScriptSchema Schema { get; private set; } = ScriptSchema.Empty;
@@ -140,6 +150,8 @@ public sealed class ProblemsService
     private ValidationContext CreateContext()
     {
         var sprites = _assets.Sprites;
+        var map = _map;
+        var mapData = _checkedMapData = map.Data;
         var index = _localisation.Index;
         var vocabulary = _gameVocabulary;
         var scriptedEffects = vocabulary?.GetKeys(ScriptVocabulary.RootContext("common/scripted_effects"));
@@ -149,6 +161,8 @@ public sealed class ProblemsService
             sprites.Count > 0 ? name => sprites.Find(name) is not null : null,
             _localisation.Language is not null ? key => index.Find(key) is not null : null,
             (blockKey, key) => vocabulary?.GetKeys(ScriptVocabulary.BlockContext(blockKey))?.ContainsKey(key) == true,
-            (key, kind) => (kind == ScriptContext.Effect ? scriptedEffects : scriptedTriggers)?.ContainsKey(key) == true);
+            (key, kind) => (kind == ScriptContext.Effect ? scriptedEffects : scriptedTriggers)?.ContainsKey(key) == true,
+            map.IsDataLoaded ? id => mapData.State(id) is not null : null,
+            map.IsDataLoaded ? map.CountryExists : null);
     }
 }

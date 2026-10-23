@@ -25,6 +25,27 @@ public sealed class FileSystemAndSpriteTests : IDisposable
     }
 
     [Fact]
+    public void ReReadsOneChangedGfxFile()
+    {
+        Write(Game, "interface/a.gfx", "spriteTypes = { spriteType = { name = GFX_a texturefile = a.dds } }");
+        Write(Mod, "interface/m.gfx", "spriteTypes = { spriteType = { name = GFX_m texturefile = m.dds } }");
+        var fs = new GameFileSystem(Game, Mod);
+        var catalog = SpriteCatalog.Load(fs);
+
+        Write(Mod, "interface/m.gfx", "spriteTypes = { spriteType = { name = GFX_m2 texturefile = m2.dds } }");
+        Write(Mod, "interface/new.gfx", "spriteTypes = { spriteType = { name = GFX_a texturefile = mod_a.dds } }");
+        var updated = catalog.WithFile(fs, "interface/m.gfx").WithFile(fs, "interface\\new.gfx");
+
+        Assert.Null(updated.Find("GFX_m"));
+        Assert.NotNull(updated.Find("GFX_m2"));
+        // The mod's file wins over the game's, as in a full load.
+        Assert.Equal("mod_a.dds", updated.Find("GFX_a")!.TextureFile);
+
+        File.Delete(Path.Combine(Mod, "interface/m.gfx"));
+        Assert.Null(updated.WithFile(fs, "interface/m.gfx").Find("GFX_m2"));
+    }
+
+    [Fact]
     public void ModFileReplacesGameFile()
     {
         Write(Game, "interface/goals.gfx", "game");

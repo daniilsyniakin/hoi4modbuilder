@@ -1,4 +1,3 @@
-using System.Text;
 using HoI4ModBuilder.Game.Localisation;
 
 namespace HoI4ModBuilder.Services;
@@ -25,13 +24,16 @@ public sealed class LocalisationEditor(ScriptWorkspace workspace, LocalisationSe
         localisation.Index.IsFallback(key) ? localisation.Index.FindDisplay(key) : null;
 
     /// <summary>
-    /// Sets the text of <paramref name="key"/>: in the mod file that has it, otherwise added to the
-    /// file holding most keys with the same prefix (e.g. <c>UKR_</c>), otherwise to a new file.
+    /// Sets the text of <paramref name="key"/>: in the mod file that has it, otherwise in the file of
+    /// this language mirroring <paramref name="source"/> (the key's file in another language), otherwise
+    /// added to the file holding most keys with the same prefix (e.g. <c>UKR_</c>), otherwise to a new file.
     /// </summary>
+    /// <param name="language">The language to write; null is the one shown.</param>
     /// <returns>An error message, or null.</returns>
-    public string? SetText(string key, string text)
+    public string? SetText(string key, string text, string? language = null, (string File, string Language)? source = null)
     {
-        if (localisation.Language is not { } language)
+        language ??= localisation.Language;
+        if (language is null)
             return "Оберіть мову локалізації, щоб змінювати тексти.";
 
         using var action = workspace.Action($"Текст «{key}»");
@@ -40,7 +42,15 @@ public sealed class LocalisationEditor(ScriptWorkspace workspace, LocalisationSe
         {
             if (workspace.ReadText(file) is { } content && LocalisationFile.FindValue(content, key) is not null)
                 return Finish(workspace.Edit(file, (current, _) =>
-                    LocalisationFile.SetValue(current, key, text) is { } edit ? [edit] : []), key, text);
+                    LocalisationFile.SetValue(current, key, text) is { } edit ? [edit] : []), key, text, language);
+        }
+
+        if (source is { } from)
+        {
+            var mirror = LocalisationTable.Mirror(from.File, from.Language, language);
+            return Finish(File.Exists(mirror) || workspace.ReadText(mirror) is not null
+                ? workspace.Edit(mirror, (current, _) => [LocalisationFile.Append(current, key, text)])
+                : workspace.CreateFile(mirror, LocalisationFile.NewFile(language, key, text), withByteOrderMark: true), key, text, language);
         }
 
         var prefix = Prefix(key);
@@ -51,16 +61,17 @@ public sealed class LocalisationEditor(ScriptWorkspace workspace, LocalisationSe
             .Select(f => f.File)
             .FirstOrDefault();
         if (target is not null)
-            return Finish(workspace.Edit(target, (current, _) => [LocalisationFile.Append(current, key, text)]), key, text);
+            return Finish(workspace.Edit(target, (current, _) => [LocalisationFile.Append(current, key, text)]), key, text, language);
 
-        var name = Slug(modName) ?? Slug(Path.GetFileName(workspace.RootPath)) ?? "mod";
+        var name = ModNames.Slug(modName, workspace.RootPath);
         var path = Path.Combine(workspace.RootPath, "localisation", language, name + LocalisationFile.Suffix(language));
-        return Finish(workspace.CreateFile(path, LocalisationFile.NewFile(language, key, text), withByteOrderMark: true), key, text);
+        return Finish(workspace.CreateFile(path, LocalisationFile.NewFile(language, key, text), withByteOrderMark: true), key, text, language);
     }
 
-    private string? Finish(string? error, string key, string text)
+    private string? Finish(string? error, string key, string text, string language)
     {
-        if (error is null)
+        // Texts of the shown language appear at once; the others when their files are re-read.
+        if (error is null && language == localisation.Language)
             localisation.Apply(key, LocalisationFile.Escape(text).Replace("\\\"", "\""));
         return error;
     }
@@ -81,15 +92,5 @@ public sealed class LocalisationEditor(ScriptWorkspace workspace, LocalisationSe
     {
         var cut = key.IndexOfAny(['_', '.']);
         return cut > 0 ? key[..(cut + 1)] : key;
-    }
-
-    /// <summary>A file-name-safe version of a name; null when nothing is left (e.g. it was all Cyrillic).</summary>
-    private static string? Slug(string name)
-    {
-        var builder = new StringBuilder();
-        foreach (var c in name.ToLowerInvariant())
-            builder.Append(char.IsAsciiLetterOrDigit(c) ? c : '_');
-        var slug = builder.ToString().Trim('_');
-        return slug.Length == 0 ? null : slug;
     }
 }

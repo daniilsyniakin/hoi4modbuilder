@@ -1,0 +1,125 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HoI4ModBuilder.ViewModels"
+             x:Class="HoI4ModBuilder.Views.LocalisationTableView"
+             x:DataType="vm:LocalisationTableTabViewModel">
+  <UserControl.Styles>
+    <Style Selector="TextBox.cell">
+      <Setter Property="FontFamily" Value="{StaticResource EditorFont}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="6,3" />
+      <Setter Property="Margin" Value="0,0,6,0" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBox.cell.missing">
+      <Setter Property="Background" Value="#1FE0A040" />
+    </Style>
+    <Style Selector="TextBox.cell:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
+    </Style>
+    <Style Selector="ListBox.table ListBoxItem">
+      <Setter Property="Padding" Value="8,2" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ToggleButton.filter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="8,3" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ToggleButton.filter:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource PressedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <!-- Toolbar -->
+    <Grid DockPanel.Dock="Top" Height="38" Margin="10,0" ColumnDefinitions="Auto,Auto,*,Auto">
+      <TextBox Text="{Binding Search}" PlaceholderText="Пошук" Width="260" MinHeight="0" Padding="8,3" VerticalAlignment="Center" />
+      <ToggleButton Grid.Column="1" Classes="filter" IsChecked="{Binding OnlyUntranslated}" Margin="8,0,0,0" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="Не перекладено" />
+          <TextBlock Text="{Binding UntranslatedCount}" Classes="secondary" />
+        </StackPanel>
+      </ToggleButton>
+      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <TextBlock Classes="secondary" FontSize="11" VerticalAlignment="Center">
+          <Run Text="{Binding KeyCount}" />
+          <Run Text="ключів" />
+        </TextBlock>
+        <Button Classes="flat" Padding="7,4" MinHeight="0">
+          <StackPanel Orientation="Horizontal" Spacing="5">
+            <PathIcon Data="{StaticResource IconPlus}" Width="10" Height="10" />
+            <TextBlock Text="Мова" />
+          </StackPanel>
+          <Button.Flyout>
+            <MenuFlyout ItemsSource="{Binding MissingLanguages}">
+              <MenuFlyout.ItemContainerTheme>
+                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:LanguageChoice">
+                  <Setter Property="Header" Value="{Binding Title}" />
+                  <Setter Property="Command" Value="{Binding $parent[UserControl].((vm:LocalisationTableTabViewModel)DataContext).AddLanguageCommand}" />
+                  <Setter Property="CommandParameter" Value="{Binding}" />
+                </ControlTheme>
+              </MenuFlyout.ItemContainerTheme>
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- Column headers -->
+    <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,1">
+      <Grid ColumnDefinitions="280,*" Margin="8,0" Height="28">
+        <TextBlock Text="Ключ" Classes="secondary" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,0" />
+        <ItemsControl Grid.Column="1" ItemsSource="{Binding Languages}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Rows="1" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <TextBlock Text="{Binding}" Classes="secondary" FontSize="12" VerticalAlignment="Center" Margin="7,6,0,0" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Grid>
+    </Border>
+
+    <Panel>
+      <ListBox x:Name="Table" Classes="table" ItemsSource="{Binding Rows}" Background="Transparent">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:LocalisationRowViewModel">
+            <Grid ColumnDefinitions="280,*">
+              <Button Classes="flat" Padding="0,3" MinHeight="0" HorizontalAlignment="Left" VerticalAlignment="Top"
+                      Command="{Binding $parent[UserControl].((vm:LocalisationTableTabViewModel)DataContext).OpenKeyCommand}"
+                      CommandParameter="{Binding}" ToolTip.Tip="{Binding Key}">
+                <TextBlock Text="{Binding Key}" FontFamily="{StaticResource EditorFont}" FontSize="12"
+                           TextTrimming="CharacterEllipsis" MaxWidth="268" />
+              </Button>
+              <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <UniformGrid Rows="1" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:LocalisationCellViewModel">
+                    <TextBox Classes="cell" Classes.missing="{Binding IsMissing}" Text="{Binding Text}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+      <TextBlock Text="Ключів немає" Classes="secondary" HorizontalAlignment="Center" VerticalAlignment="Center"
+                 IsVisible="{Binding IsEmpty}" />
+    </Panel>
+  </DockPanel>
+</UserControl>

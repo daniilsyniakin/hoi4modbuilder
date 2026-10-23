@@ -100,10 +100,15 @@ internal sealed class InspectorBuilder(
                 var kind = depth == 0 && key.Equals("id", StringComparison.OrdinalIgnoreCase)
                     ? ScalarKind.ReadOnly
                     : KindOf(schema?.Type ?? ShapeAsSchema(command?.Shape), value);
+                var takesState = kind is ScalarKind.Text or ScalarKind.Number && suggestions.TakesState(key);
                 node = new ScalarNode(key, path, depth, false, editor, kind, value,
                     kind == ScalarKind.Text ? suggestions.Values(contextKey, key) : [])
                 {
-                    Hint = kind == ScalarKind.ReadOnly ? null : suggestions.Describe(value),
+                    Hint = kind == ScalarKind.ReadOnly ? null : takesState ? suggestions.StateName(value) : suggestions.Describe(value),
+                    PickStateCommand = takesState
+                        ? new CommunityToolkit.Mvvm.Input.RelayCommand(() => suggestions.PickState(id => editor.SetValue(path, id.ToString())))
+                        : null,
+                    Preview = suggestions.Preview(parentContext, property),
                     Picker = depth == 0 ? pickers?.GetValueOrDefault(key) : null,
                 };
                 break;
@@ -119,6 +124,9 @@ internal sealed class InspectorBuilder(
 
         node.Documentation = command is null ? null : Describe(command);
         node.Problem = problems?.GetValueOrDefault(path.ToString());
+        // Modifiers the app has no name for are called what the game calls them.
+        if (parentContext == ScriptContext.Modifier && !PropertyLabels.Has(key) && suggestions.ModifierName(key) is { } name)
+            node.Label = name;
         return node;
     }
 
@@ -199,7 +207,7 @@ internal sealed class InspectorBuilder(
                 choice =>
                 {
                     expansion[$"{identity}|{path.Append(choice.Name, existing.GetValueOrDefault(choice.Name))}"] = true;
-                    editor.AddProperty(path, choice.Name, choice.Template);
+                    editor.AddProperty(path, choice.Name, choice.Template ?? suggestions.DefaultValue(blockKey, choice.Name));
                 });
         }
         return node;

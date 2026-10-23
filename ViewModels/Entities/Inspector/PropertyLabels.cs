@@ -128,7 +128,39 @@ public static class PropertyLabels
         ["logistics_skill"] = "Логістика",
         ["slot"] = "Посада",
         ["idea_token"] = "Токен ідеї",
+        // States
+        ["owner"] = "Власник",
+        ["controller"] = "Контролер",
+        ["add_core_of"] = "Ядро",
+        ["add_claim_by"] = "Претензія",
+        ["victory_points"] = "Переможні очки",
+        ["buildings"] = "Будівлі",
+        ["infrastructure"] = "Інфраструктура",
+        ["arms_factory"] = "Військові заводи",
+        ["industrial_complex"] = "Цивільні заводи",
+        ["dockyard"] = "Верфі",
+        ["air_base"] = "Авіабаза",
+        ["naval_base"] = "Військово-морська база",
+        ["anti_air_building"] = "ППО",
+        ["bunker"] = "Укріплення",
+        ["coastal_bunker"] = "Берегові укріплення",
+        ["synthetic_refinery"] = "Завод синтетики",
+        ["fuel_silo"] = "Паливне сховище",
+        ["radar_station"] = "Радар",
+        ["rocket_site"] = "Ракетний майданчик",
+        ["nuclear_reactor"] = "Ядерний реактор",
+        ["oil"] = "Нафта",
+        ["aluminium"] = "Алюміній",
+        ["rubber"] = "Каучук",
+        ["tungsten"] = "Вольфрам",
+        ["steel"] = "Сталь",
+        ["chromium"] = "Хром",
+        ["local_supplies"] = "Місцеве постачання",
+        ["buildings_max_level_factor"] = "Множник рівня будівель",
+        ["impassable"] = "Непрохідна",
     };
 
     public static string Label(string key) => Labels.GetValueOrDefault(key, key);
+
+    public static bool Has(string key) => Labels.ContainsKey(key);
 }

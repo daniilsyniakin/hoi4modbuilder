@@ -4,6 +4,7 @@
              xmlns:graph="using:HoI4ModBuilder.Views.Graph"
              xmlns:views="using:HoI4ModBuilder.Views.Entities"
              xmlns:conv="using:HoI4ModBuilder.Views.Converters"
+             xmlns:gv="using:HoI4ModBuilder.Views"
              x:Class="HoI4ModBuilder.Views.Entities.FocusTreeView"
              x:DataType="ent:FocusTreeTabViewModel">
   <UserControl.Styles>
@@ -41,6 +42,19 @@
     <Style Selector="Border.focus-node.shared Border.focus-plate">
       <Setter Property="BorderBrush" Value="#3B6E8F" />
     </Style>
+    <!-- Drag from it onto another focus: a prerequisite -->
+    <Style Selector="Ellipse.link-handle">
+      <Setter Property="Width" Value="12" />
+      <Setter Property="Height" Value="12" />
+      <Setter Property="Fill" Value="#C9B37E" />
+      <Setter Property="Stroke" Value="#1E1F22" />
+      <Setter Property="StrokeThickness" Value="2" />
+      <Setter Property="Cursor" Value="Cross" />
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Border.focus-node:pointerover Ellipse.link-handle, Border.focus-node.selected Ellipse.link-handle">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
   </UserControl.Styles>
 
   <Grid ColumnDefinitions="*,1,340">
@@ -72,7 +86,7 @@
       </Border>
 
       <Panel>
-        <graph:GraphSurface x:Name="Surface" Background="{DynamicResource WindowBgBrush}"
+        <graph:GraphSurface x:Name="Surface" Background="{DynamicResource WindowBgBrush}" DragSelects="True"
                             ViewTransform="{Binding ViewTransform}">
           <Canvas x:Name="World" Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}">
             <graph:GraphEdgesControl Edges="{Binding RelativeEdges}" Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}" />
@@ -96,11 +110,14 @@
                           Classes.link-source="{Binding IsLinkSource}" Classes.shared="{Binding IsShared}"
                           Width="{Binding Width}" Height="{Binding Height}">
                     <ToolTip.Tip>
-                      <StackPanel Spacing="2">
-                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                      <StackPanel Spacing="4" MaxWidth="420">
+                        <gv:GameTooltipView Lines="{Binding GameTooltip}" />
+                        <StackPanel Spacing="2" IsVisible="{Binding !HasGameTooltip}">
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding CostText}" FontSize="11" Opacity="0.7"
+                                     IsVisible="{Binding CostText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </StackPanel>
                         <TextBlock Text="{Binding Id}" FontFamily="{StaticResource EditorFont}" FontSize="11" Opacity="0.7" />
-                        <TextBlock Text="{Binding CostText}" FontSize="11" Opacity="0.7"
-                                   IsVisible="{Binding CostText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                       </StackPanel>
                     </ToolTip.Tip>
                     <Border.ContextMenu>
@@ -112,6 +129,9 @@
                                   Command="{Binding $parent[UserControl].((ent:FocusTreeTabViewModel)DataContext).StartExclusiveLinkCommand}"
                                   CommandParameter="{Binding}" />
                         <Separator />
+                        <MenuItem Header="Знайти використання" InputGesture="Alt+F7"
+                                  Command="{Binding $parent[UserControl].((ent:FocusTreeTabViewModel)DataContext).FindFocusUsagesCommand}"
+                                  CommandParameter="{Binding}" />
                         <MenuItem Header="Перейменувати…" InputGesture="F2"
                                   Command="{Binding $parent[UserControl].((ent:FocusTreeTabViewModel)DataContext).RenameFocusCommand}"
                                   CommandParameter="{Binding}">
@@ -123,7 +143,7 @@
                                   Command="{Binding $parent[UserControl].((ent:FocusTreeTabViewModel)DataContext).OpenFocusInCodeCommand}"
                                   CommandParameter="{Binding}" />
                         <Separator />
-                        <MenuItem Header="Видалити фокус"
+                        <MenuItem Header="Видалити фокус" InputGesture="Delete"
                                   Command="{Binding $parent[UserControl].((ent:FocusTreeTabViewModel)DataContext).DeleteFocusCommand}"
                                   CommandParameter="{Binding}">
                           <MenuItem.Icon>
@@ -145,6 +165,7 @@
                                    MaxLines="2" TextTrimming="CharacterEllipsis" LineHeight="13" />
                       </Border>
                     </StackPanel>
+                      <Ellipse Classes="link-handle" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,-7" />
                       <Border Classes="badge" Classes.error="{Binding HasError}" IsVisible="{Binding HasProblems}"
                               HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,14,0"
                               ToolTip.Tip="{Binding ProblemText}">
@@ -159,8 +180,15 @@
             </ItemsControl>
             <!-- The link being drawn, above the nodes -->
             <graph:GraphEdgesControl Edges="{Binding PreviewEdges}" Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}" />
+            <!-- The selection frame being drawn -->
+            <Border x:Name="Band" IsVisible="False" BorderThickness="1" BorderBrush="{DynamicResource AccentBrush}"
+                    Background="#223574F0" IsHitTestVisible="False" />
           </Canvas>
         </graph:GraphSurface>
+
+        <graph:GraphMinimap Surface="{Binding #Surface}" Nodes="{Binding Nodes}"
+                            WorldWidth="{Binding CanvasWidth}" WorldHeight="{Binding CanvasHeight}"
+                            HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12" />
 
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6"
                     IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">

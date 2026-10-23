@@ -8,6 +8,7 @@ using HoI4ModBuilder.Clausewitz;
 using HoI4ModBuilder.Clausewitz.Editing;
 using HoI4ModBuilder.Clausewitz.Syntax;
 using HoI4ModBuilder.Game.Content;
+using HoI4ModBuilder.Game.Tooltips;
 using HoI4ModBuilder.Services;
 using HoI4ModBuilder.ViewModels.Entities.Inspector;
 
@@ -42,6 +43,13 @@ public sealed partial class FocusNodeViewModel : GraphNodeViewModel
     /// <summary>Days to complete (cost is in weeks), for the tooltip.</summary>
     [ObservableProperty]
     public partial string? CostText { get; set; }
+
+    /// <summary>The tooltip the game shows for the focus: completion time and reward in words.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasGameTooltip))]
+    public partial IReadOnlyList<TooltipLine>? GameTooltip { get; set; }
+
+    public bool HasGameTooltip => GameTooltip is not null;
 
     public bool IsShared { get; set; }
 
@@ -85,6 +93,7 @@ public sealed partial class FocusTreeTabViewModel : EntityTabViewModel
     private int _minX;
     private int _minY;
     private string? _pendingSelection;
+    private HashSet<string>? _pendingGroup;
 
     public FocusTreeTabViewModel(EntityContext context, string treeId, string filePath, Action<DocumentTabViewModel> close)
         : base(context, ContentKind.FocusTree, treeId, filePath, close)
@@ -162,14 +171,72 @@ public sealed partial class FocusTreeTabViewModel : EntityTabViewModel
             _pendingSelection = focusId;
     }
 
+    // ── Selection: one focus in the inspector, any number selected ─────
+
+    private readonly List<FocusNodeViewModel> _selection = [];
+
+    /// <summary>All selected focuses; <see cref="SelectedNode"/> is the one the inspector shows.</summary>
+    public IReadOnlyList<FocusNodeViewModel> Selection => _selection;
+
     partial void OnSelectedNodeChanged(FocusNodeViewModel? oldValue, FocusNodeViewModel? newValue)
     {
-        if (oldValue is not null)
-            oldValue.IsSelected = false;
-        if (newValue is not null)
-            newValue.IsSelected = true;
+        // Picking one focus the usual way selects only it; adding to a selection keeps the rest.
+        if (newValue is null)
+            ReplaceSelection([]);
+        else if (!_selection.Contains(newValue))
+            ReplaceSelection([newValue]);
         ShowPanel(newValue is null ? null : BuildFocusPanel(newValue));
         UpdateRelativeEdges();
+    }
+
+    /// <summary>A click: selects only <paramref name="node"/>, unless it is part of the selection (to drag them all).</summary>
+    public void Click(FocusNodeViewModel node)
+    {
+        if (_selection.Contains(node) && _selection.Count > 1)
+            SelectedNode = node;
+        else
+        {
+            ReplaceSelection([node]);
+            SelectedNode = node;
+        }
+    }
+
+    /// <summary>Ctrl/Shift+click: adds the focus to the selection or takes it out.</summary>
+    public void ToggleSelected(FocusNodeViewModel node)
+    {
+        if (_selection.Remove(node))
+        {
+            node.IsSelected = false;
+            if (SelectedNode == node)
+                SelectedNode = _selection.LastOrDefault();
+        }
+        else
+        {
+            _selection.Add(node);
+            node.IsSelected = true;
+            SelectedNode = node;
+        }
+    }
+
+    /// <summary>The focuses inside a frame drawn on the canvas (world coordinates).</summary>
+    public void SelectInRect(Rect rect, bool add)
+    {
+        var inside = Nodes.Where(n => rect.Intersects(new Rect(n.X, n.Y, n.Width, n.Height))).ToList();
+        ReplaceSelection(add ? _selection.Concat(inside).Distinct().ToList() : inside);
+        if (SelectedNode is null || !_selection.Contains(SelectedNode))
+            SelectedNode = _selection.FirstOrDefault();
+    }
+
+    private void ReplaceSelection(IReadOnlyList<FocusNodeViewModel> nodes)
+    {
+        foreach (var node in _selection)
+            node.IsSelected = false;
+        _selection.Clear();
+        foreach (var node in nodes.Distinct())
+        {
+            _selection.Add(node);
+            node.IsSelected = true;
+        }
     }
 
     public override (ContentKind Kind, string Id)? RenameTarget =>
@@ -180,6 +247,13 @@ public sealed partial class FocusTreeTabViewModel : EntityTabViewModel
         base.OnRenamed(kind, oldId, newId);
         if (kind == ContentKind.Focus && SelectedNode?.Id == oldId)
             _pendingSelection = newId;
+    }
+
+    [RelayCommand]
+    private void FindFocusUsages(FocusNodeViewModel? node)
+    {
+        if (node is not null)
+            Context.FindUsages(node.Id);
     }
 
     [RelayCommand]
@@ -238,12 +312,18 @@ public sealed partial class FocusTreeTabViewModel : EntityTabViewModel
         CanvasWidth = (maxX - _minX + 1) * CellWidth + 2 * Margin;
         CanvasHeight = (maxY - _minY + 1) * CellHeight + 2 * Margin;
 
-        SyncNodes(focuses);
+        SyncNodes(focuses, Load);
         Edges = BuildEdges();
         if (HoveredNode is { } hovered && !Nodes.Contains(hovered))
             HoveredNode = null;
         UpdateRelativeEdges();
 
+        // Focuses that are gone leave the selection; pasted ones become it.
+        var stillSelected = _pendingGroup is { } group
+            ? Nodes.Where(n => group.Contains(n.Id)).ToList()
+            : _selection.Where(Nodes.Contains).ToList();
+        _pendingGroup = null;
+        ReplaceSelection(stillSelected);
         var selectedId = _pendingSelection ?? SelectedNode?.Id;
         _pendingSelection = null;
         var selected = selectedId is null ? null : Nodes.FirstOrDefault(n => n.Id.Equals(selectedId, StringComparison.OrdinalIgnoreCase));
@@ -253,7 +333,7 @@ public sealed partial class FocusTreeTabViewModel : EntityTabViewModel
             SelectedNode = selected;
     }
 
-    private void SyncNodes(List<(FocusDefinition Focus, string File)> focuses)
+    private void SyncNodes(List<(FocusDefinition Focus, string File)> focuses, Func<string, (string Text, SyntaxTree Tree)?> load)
     {
         var existing = Nodes.ToDictionary(n => n.Id, StringComparer.OrdinalIgnoreCase);
         var result = new List<FocusNodeViewModel>();
@@ -275,6 +355,10 @@ public sealed partial class FocusTreeTabViewModel : EntityTabViewModel
             node.Y = ToWorldY(gridY);
             node.Title = Context.Localisation.Text(focus.Id) ?? focus.Id;
             node.ShowProblems(Context.Problems.For(ContentKind.Focus, focus.Id));
+            node.GameTooltip = load(file) is { } source
+                && ContentParser.Locate(source.Tree, Context.Workspace.Relative(file), ContentKind.Focus, focus.Id)?.Value is BlockSyntax block
+                    ? Context.Tooltips.For("focus", ContentKind.Focus, node.Title, block)
+                    : null;
             node.CostText = double.TryParse(focus.Cost, System.Globalization.CultureInfo.InvariantCulture, out var weeks)
                 ? $"{weeks * 7:0} днів"
                 : null;
@@ -420,6 +504,143 @@ public sealed partial class FocusTreeTabViewModel : EntityTabViewModel
         node.Y = ToWorldY(gridY);
     }
 
+    /// <summary>
+    /// Moves focuses together by whole cells, as one step. A focus placed relative to another moved
+    /// focus keeps its offsets; the others get theirs shifted.
+    /// </summary>
+    public void MoveFocuses(IReadOnlyList<FocusNodeViewModel> nodes, int dx, int dy)
+    {
+        if (nodes.Count == 1)
+        {
+            MoveFocus(nodes[0], nodes[0].GridX + dx, nodes[0].GridY + dy);
+            return;
+        }
+        using var action = Action($"Переміщення фокусів ({nodes.Count})");
+        var moved = new HashSet<string>(nodes.Select(n => n.Id), StringComparer.OrdinalIgnoreCase);
+        foreach (var node in nodes)
+        {
+            node.X = ToWorldX(node.GridX + dx);
+            node.Y = ToWorldY(node.GridY + dy);
+            if (node.Definition.RelativeTo is { } anchor && moved.Contains(anchor))
+                continue;
+            var x = (node.Definition.X + dx).ToString();
+            var y = (node.Definition.Y + dy).ToString();
+            Edit(node.FilePath, (text, tree) =>
+                EntityLocator(node.FilePath, ContentKind.Focus, node.Id)(tree) is { } block
+                    ? [ScriptEdits.SetProperty(text, block, "x", x), ScriptEdits.SetProperty(text, block, "y", y)]
+                    : []);
+        }
+    }
+
+    /// <summary>Delete: removes every selected focus, as one step.</summary>
+    [RelayCommand]
+    private void DeleteSelected()
+    {
+        var nodes = _selection.ToList();
+        if (nodes.Count == 0)
+            return;
+        using var action = Action(nodes.Count == 1 ? "Видалення фокуса" : $"Видалення фокусів ({nodes.Count})");
+        foreach (var node in nodes)
+        {
+            Edit(node.FilePath, (text, tree) =>
+                ContentParser.Locate(tree, Context.Workspace.Relative(node.FilePath), ContentKind.Focus, node.Id) is { } property
+                    ? [ScriptEdits.RemoveStatement(text, property)]
+                    : []);
+        }
+        SelectedNode = null;
+        RefreshNow();
+    }
+
+    // ── Copy and paste ────────────────────────────────────────
+
+    /// <summary>Focuses copied in any focus tree tab, ready to paste into this one or another.</summary>
+    private static IReadOnlyList<CopiedFocus> _clipboard = [];
+
+    public static bool HasCopied => _clipboard.Count > 0;
+
+    /// <summary>Ctrl+C: remembers the selected focuses; returns their script for the system clipboard.</summary>
+    public string? CopySelected()
+    {
+        var copied = new List<CopiedFocus>();
+        foreach (var node in _selection.OrderBy(n => n.GridY).ThenBy(n => n.GridX))
+        {
+            if (Read(node.FilePath) is not { } read
+                || ContentParser.Locate(read.Tree, Context.Workspace.Relative(node.FilePath), ContentKind.Focus, node.Id) is not { } property)
+                continue;
+            var span = property.Span;
+            copied.Add(new CopiedFocus(node.Id, read.Text.Substring(span.Start, span.Length), ScriptEdits.IndentOf(read.Text, span.Start),
+                node.GridX, node.GridY, node.Definition.RelativeTo));
+        }
+        if (copied.Count == 0)
+            return null;
+        _clipboard = copied;
+        return string.Join(Environment.NewLine, copied.Select(c => c.Text));
+    }
+
+    /// <summary>
+    /// Ctrl+V: the copied focuses as new ones, their top-left one at <paramref name="cell"/>. Ids get a
+    /// new prefix (asked when they share one) or a number; their names and descriptions come along.
+    /// </summary>
+    public async Task PasteAsync((int X, int Y) cell)
+    {
+        var copied = _clipboard;
+        if (copied.Count == 0)
+            return;
+
+        var ids = copied.Select(c => c.Id).ToList();
+        var prefix = FocusCopy.CommonPrefix(ids);
+        string? newPrefix = null;
+        if (prefix is not null)
+        {
+            newPrefix = await Context.Prompt("Вставка фокусів", $"Префікс нових id замість «{prefix}»", "Вставити", null,
+                value => Renaming.IsValidId(value) ? null : "Префікс має бути одним словом, без пробілів і лапок.", prefix);
+            if (newPrefix is null)
+                return;
+        }
+
+        var taken = Context.Content.Files.Values.SelectMany(ContentParser.Flatten)
+            .Where(e => e.Kind == ContentKind.Focus)
+            .Select(e => e.Id)
+            .Concat(_layout.Keys);
+        var renames = FocusCopy.NewIds(ids, prefix, newPrefix, taken);
+        var origin = (X: copied.Min(c => c.GridX), Y: copied.Min(c => c.GridY));
+        // Not on top of existing focuses: lower until every pasted one has a free cell.
+        var occupied = new HashSet<(int, int)>(_layout.Values);
+        for (var tries = 0; tries < 100 && copied.Any(c => occupied.Contains((cell.X + c.GridX - origin.X, cell.Y + c.GridY - origin.Y))); tries++)
+            cell.Y++;
+
+        using (Action(copied.Count == 1 ? "Вставка фокуса" : $"Вставка фокусів ({copied.Count})"))
+        {
+            Edit(FilePath, (text, tree) =>
+            {
+                if (EntityLocator(FilePath, ContentKind.FocusTree, EntityId)(tree) is not { } block)
+                    return [];
+                var indent = block.Statements.LastOrDefault() is { } last
+                    ? ScriptEdits.IndentOf(text, last.Span.Start)
+                    : ScriptEdits.IndentOf(text, block.CloseBrace.Position) + "\t";
+                var newLine = ScriptEdits.NewLine(text);
+                var statements = copied.Select(c => FocusCopy.Rewrite(c, renames, origin, cell, indent).Replace("\r\n", "\n").Replace("\n", newLine));
+                return [ScriptEdits.InsertStatement(text, block, string.Join(newLine + indent, statements))];
+            });
+
+            // Names and descriptions in the shown language, under the new ids.
+            if (Context.Texts.CanEdit)
+            {
+                foreach (var (oldId, newId) in renames)
+                {
+                    foreach (var suffix in new[] { "", "_desc" })
+                    {
+                        if (Context.Texts.EditableText(oldId + suffix) is { } text)
+                            Context.ReportError(Context.Texts.SetText(newId + suffix, text));
+                    }
+                }
+            }
+        }
+        _pendingGroup = new HashSet<string>(renames.Values, StringComparer.OrdinalIgnoreCase);
+        _pendingSelection = renames[copied[0].Id];
+        RefreshNow();
+    }
+
     /// <summary>Adds a new focus to the tree at a grid cell and selects it.</summary>
     public void AddFocus(int gridX, int gridY)
     {
@@ -459,8 +680,14 @@ public sealed partial class FocusTreeTabViewModel : EntityTabViewModel
     [RelayCommand]
     private void DeleteFocus(FocusNodeViewModel? node)
     {
-        using var action = Action("Видалення фокуса");
         node ??= SelectedNode;
+        // From the menu of one of several selected focuses: all of them go.
+        if (node is not null && _selection.Contains(node) && _selection.Count > 1)
+        {
+            DeleteSelected();
+            return;
+        }
+        using var action = Action("Видалення фокуса");
         if (node is null)
             return;
         Edit(node.FilePath, (text, tree) =>
@@ -513,7 +740,8 @@ public sealed partial class FocusTreeTabViewModel : EntityTabViewModel
     }
 
     /// <summary>The second click of a link: connects the source focus with <paramref name="target"/>.</summary>
-    public void CompleteLink(FocusNodeViewModel target)
+    /// <param name="alternative">For a prerequisite: one of several (any is enough), added to its last prerequisite block.</param>
+    public void CompleteLink(FocusNodeViewModel target, bool alternative = false)
     {
         var source = _linkSource;
         var mode = LinkMode;
@@ -530,7 +758,18 @@ public sealed partial class FocusTreeTabViewModel : EntityTabViewModel
 
         if (mode == FocusLinkMode.Prerequisite)
         {
-            AddStatement(target, $"prerequisite = {{ focus = {source.Id} }}");
+            var added = false;
+            if (alternative)
+            {
+                Edit(target.FilePath, (text, tree) =>
+                    EntityLocator(target.FilePath, ContentKind.Focus, target.Id)(tree) is { } block
+                    && ScriptRead.Blocks(block, "prerequisite").LastOrDefault() is { } group
+                        ? [ScriptEdits.InsertStatement(text, group, $"focus = {source.Id}")]
+                        : []);
+                added = target.Definition.Prerequisites.Count > 0;
+            }
+            if (!added)
+                AddStatement(target, $"prerequisite = {{ focus = {source.Id} }}");
         }
         else if (mode == FocusLinkMode.MutuallyExclusive)
         {

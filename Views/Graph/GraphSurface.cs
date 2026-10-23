@@ -9,8 +9,10 @@ namespace HoI4ModBuilder.Views.Graph;
 
 /// <summary>
 /// An infinite canvas viewport: the child is the "world" (a canvas of nodes), shown through a
-/// pan/zoom transform. Wheel zooms around the pointer, dragging the background pans. Nodes handle
-/// their own pointer presses; presses that reach the surface pan or count as a background click.
+/// pan/zoom transform. Wheel zooms around the pointer, dragging the background pans — or, with
+/// <see cref="DragSelects"/>, draws a selection frame while the right or middle button (or Space
+/// held) pans. Nodes handle their own pointer presses; presses that reach the surface pan, select
+/// or count as a background click.
 /// </summary>
 public class GraphSurface : Border
 {
@@ -28,6 +30,13 @@ public class GraphSurface : Border
 
     public static readonly RoutedEvent<GraphBackgroundEventArgs> BackgroundDoubleClickedEvent =
         RoutedEvent.Register<GraphSurface, GraphBackgroundEventArgs>(nameof(BackgroundDoubleClicked), RoutingStrategies.Bubble);
+
+    /// <summary>Dragging the background with the left button draws a selection frame instead of panning.</summary>
+    public static readonly StyledProperty<bool> DragSelectsProperty =
+        AvaloniaProperty.Register<GraphSurface, bool>(nameof(DragSelects));
+
+    private Point? _bandStart;
+    private bool _spaceHeld;
 
     private Matrix _matrix = Matrix.Identity;
     private Point? _panStart;
@@ -61,7 +70,22 @@ public class GraphSurface : Border
         remove => RemoveHandler(BackgroundDoubleClickedEvent, value);
     }
 
+    public bool DragSelects
+    {
+        get => GetValue(DragSelectsProperty);
+        set => SetValue(DragSelectsProperty, value);
+    }
+
+    /// <summary>The selection frame as it is drawn, in world coordinates; null when it is over.</summary>
+    public event EventHandler<GraphSelectionEventArgs>? SelectionChanging;
+
+    /// <summary>The selection frame once the button is released, in world coordinates.</summary>
+    public event EventHandler<GraphSelectionEventArgs>? SelectionCompleted;
+
     public double Zoom => _matrix.M11;
+
+    /// <summary>World → surface transform.</summary>
+    public Matrix ViewMatrix => _matrix;
 
     /// <summary>Raised when <see cref="Zoom"/> changes, for a zoom read-out.</summary>
     public event EventHandler? ZoomChanged;
@@ -146,12 +170,50 @@ public class GraphSurface : Border
         e.Handled = true;
     }
 
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Key == Key.Space && !_spaceHeld)
+        {
+            _spaceHeld = true;
+            Cursor = new Cursor(StandardCursorType.Hand);
+            e.Handled = true;
+        }
+    }
+
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+        if (e.Key == Key.Space)
+        {
+            _spaceHeld = false;
+            if (_panStart is null)
+                Cursor = null;
+        }
+    }
+
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
         Focus();
         var point = e.GetCurrentPoint(this);
-        if (e.Handled || !(point.Properties.IsLeftButtonPressed || point.Properties.IsMiddleButtonPressed))
+        var properties = point.Properties;
+        if (e.Handled)
+            return;
+        // Right-button panning only from empty space: on a node it opens the node's menu.
+        var onBackground = ReferenceEquals(e.Source, this) || (e.Source as Control)?.DataContext == DataContext;
+        var pans = properties.IsMiddleButtonPressed
+                   || properties.IsRightButtonPressed && DragSelects && onBackground
+                   || properties.IsLeftButtonPressed && (!DragSelects || _spaceHeld);
+        if (properties.IsLeftButtonPressed && DragSelects && !_spaceHeld)
+        {
+            _bandStart = point.Position;
+            _panned = false;
+            e.Pointer.Capture(this);
+            e.Handled = true;
+            return;
+        }
+        if (!pans)
             return;
         _panStart = point.Position;
         _panStartMatrix = _matrix;
@@ -163,6 +225,15 @@ public class GraphSurface : Border
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
+        if (_bandStart is { } bandStart)
+        {
+            var position = e.GetPosition(this);
+            if (!_panned && Math.Abs(position.X - bandStart.X) + Math.Abs(position.Y - bandStart.Y) < ClickSlop)
+                return;
+            _panned = true;
+            SelectionChanging?.Invoke(this, new GraphSelectionEventArgs(Band(bandStart, position), e.KeyModifiers));
+            return;
+        }
         if (_panStart is not { } start)
             return;
         var delta = e.GetPosition(this) - start;
@@ -176,13 +247,37 @@ public class GraphSurface : Border
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        if (_bandStart is { } bandStart)
+        {
+            _bandStart = null;
+            e.Pointer.Capture(null);
+            if (_panned)
+            {
+                var band = Band(bandStart, e.GetPosition(this));
+                SelectionChanging?.Invoke(this, new GraphSelectionEventArgs(null, e.KeyModifiers));
+                SelectionCompleted?.Invoke(this, new GraphSelectionEventArgs(band, e.KeyModifiers));
+            }
+            else if (e.InitialPressMouseButton == MouseButton.Left)
+            {
+                RaiseEvent(new GraphBackgroundEventArgs(BackgroundClickedEvent, ToWorld(e.GetPosition(this))));
+            }
+            return;
+        }
         if (_panStart is null)
             return;
         _panStart = null;
-        Cursor = null;
+        Cursor = _spaceHeld ? new Cursor(StandardCursorType.Hand) : null;
         e.Pointer.Capture(null);
         if (!_panned && e.InitialPressMouseButton == MouseButton.Left)
             RaiseEvent(new GraphBackgroundEventArgs(BackgroundClickedEvent, ToWorld(e.GetPosition(this))));
+    }
+
+    /// <summary>The world rectangle between two surface points.</summary>
+    private Rect Band(Point a, Point b)
+    {
+        var from = ToWorld(a);
+        var to = ToWorld(b);
+        return new Rect(new Point(Math.Min(from.X, to.X), Math.Min(from.Y, to.Y)), new Point(Math.Max(from.X, to.X), Math.Max(from.Y, to.Y)));
     }
 
     private void OnDoubleTapped(object? sender, TappedEventArgs e)
@@ -216,6 +311,15 @@ public class GraphSurface : Border
         }
         ZoomChanged?.Invoke(this, EventArgs.Empty);
     }
+}
+
+/// <summary>A selection frame on a <see cref="GraphSurface"/>, in world coordinates; null when it has been taken away.</summary>
+public sealed class GraphSelectionEventArgs(Rect? rect, KeyModifiers modifiers) : EventArgs
+{
+    public Rect? Rect { get; } = rect;
+
+    /// <summary>Ctrl or Shift held: add to the selection instead of replacing it.</summary>
+    public bool Adds { get; } = (modifiers & (KeyModifiers.Control | KeyModifiers.Shift)) != 0;
 }
 
 /// <summary>A click on empty space of a <see cref="GraphSurface"/>, in world coordinates.</summary>

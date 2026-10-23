@@ -6,6 +6,7 @@
              xmlns:glob="using:System.Globalization"
              xmlns:val="using:HoI4ModBuilder.Game.Validation"
              xmlns:conv="using:HoI4ModBuilder.Views.Converters"
+             xmlns:gv="using:HoI4ModBuilder.Views"
              x:Class="HoI4ModBuilder.Views.Entities.PropertyPanel"
              x:DataType="ent:PropertyPanelViewModel">
   <UserControl.Styles>
@@ -129,6 +130,12 @@
     <Style Selector="Button.picture Border.pencil">
       <Setter Property="Opacity" Value="0.85" />
     </Style>
+    <!-- A picture being dragged over the image -->
+    <Style Selector="Button.picture.drop /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="Background" Value="#223574F0" />
+    </Style>
     <Style Selector="Button.picture:pointerover Border.pencil">
       <Setter Property="Opacity" Value="1" />
     </Style>
@@ -143,7 +150,8 @@
           <TextBlock Text="{Binding Label}" Classes="label" />
           <TextBlock Text="{Binding Key}" Classes="key" IsVisible="{Binding ShowKey}" />
         </StackPanel>
-        <Panel Grid.Column="1" VerticalAlignment="Center">
+        <Grid Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+        <Panel>
           <views:SuggestionBox Classes="value" IsVisible="{Binding IsText}" Text="{Binding Text, Mode=TwoWay}"
                            ItemsSource="{Binding Suggestions}" PlaceholderText="{Binding Placeholder}"
                            />
@@ -164,12 +172,22 @@
           <SelectableTextBlock IsVisible="{Binding IsReadOnly}" Text="{Binding Text}" FontFamily="{StaticResource EditorFont}"
                                FontSize="12" TextWrapping="Wrap" />
         </Panel>
+        <!-- A state id: click it on the map -->
+        <Button Grid.Column="1" Classes="flat" Padding="6" MinHeight="0" Margin="4,0,0,0" IsVisible="{Binding CanPickState}"
+                Command="{Binding PickStateCommand}" ToolTip.Tip="Обрати на карті">
+          <PathIcon Data="{StaticResource IconTarget}" Width="12" Height="12" Foreground="{DynamicResource AccentHoverBrush}" />
+        </Button>
+        </Grid>
         <Button Grid.Column="2" Classes="flat remove" Command="{Binding RemoveCommand}" IsVisible="{Binding IsPresent}"
                 ToolTip.Tip="Видалити властивість">
           <PathIcon Data="{StaticResource IconClose}" Width="8" Height="8" />
         </Button>
-        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Hint}" Classes="secondary" FontSize="11" TextWrapping="Wrap"
-                   Margin="2,2,0,2" IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <StackPanel Grid.Row="1" Grid.Column="1" Margin="2,2,0,2">
+          <gv:GameTextBlock Runs="{Binding Preview}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                            IsVisible="{Binding Preview, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock Text="{Binding Hint}" Classes="secondary" FontSize="11" TextWrapping="Wrap"
+                     IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
         <TextBlock Grid.Row="2" Grid.ColumnSpan="3" Classes="problem" Text="{Binding Problem.Message, FallbackValue=''}"
                    IsVisible="{Binding Problem, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </Grid>
@@ -319,6 +337,8 @@
           </MultiBinding>
         </SelectableTextBlock.IsVisible>
       </SelectableTextBlock>
+
+      <gv:GameTooltipView Lines="{Binding Tooltip}" />
 
       <Button Classes="flat" Padding="8,4" MinHeight="0" HorizontalAlignment="Left"
               Command="{Binding OpenInCodeCommand}">

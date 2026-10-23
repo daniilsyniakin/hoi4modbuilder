@@ -4,6 +4,7 @@
              xmlns:graph="using:HoI4ModBuilder.Views.Graph"
              xmlns:views="using:HoI4ModBuilder.Views.Entities"
              xmlns:conv="using:HoI4ModBuilder.Views.Converters"
+             xmlns:gv="using:HoI4ModBuilder.Views"
              x:Class="HoI4ModBuilder.Views.Entities.EventGraphView"
              x:DataType="ent:EventGraphTabViewModel">
   <UserControl.Styles>
@@ -162,9 +163,9 @@
                                   <TextBlock Text="▸" Foreground="#C9B37E" />
                                   <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" MaxWidth="250" />
                                 </StackPanel>
-                                <TextBlock Text="{Binding Effects}" IsVisible="{Binding HasEffects}"
-                                           FontFamily="{StaticResource EditorFont}" FontSize="11" LineHeight="16"
-                                           Classes="secondary" TextTrimming="CharacterEllipsis" Margin="16,0,0,0" />
+                                <gv:GameTextBlock Runs="{Binding Effects}" IsVisible="{Binding HasEffects}"
+                                                  FontSize="11" LineHeight="16" TextWrapping="NoWrap"
+                                                  Classes="secondary" TextTrimming="CharacterEllipsis" Margin="16,0,0,0" />
                               </StackPanel>
                             </Border>
                           </DataTemplate>

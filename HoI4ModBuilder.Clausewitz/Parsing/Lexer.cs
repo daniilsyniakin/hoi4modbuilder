@@ -16,7 +16,6 @@ internal sealed class Lexer(string text, DiagnosticBag diagnostics, LineState in
 {
     private const char ByteOrderMark = '﻿';
 
-    private readonly ImmutableArray<SyntaxTrivia>.Builder _triviaBuffer = ImmutableArray.CreateBuilder<SyntaxTrivia>();
     private LineState _resumeState = initialState;
     private int _position;
 
@@ -25,28 +24,28 @@ internal sealed class Lexer(string text, DiagnosticBag diagnostics, LineState in
 
     public SyntaxToken Lex()
     {
-        ImmutableArray<SyntaxTrivia> leading;
+        var fullStart = _position;
+        var lineBreakBefore = false;
         int start;
         SyntaxKind kind;
         if (_resumeState != LineState.Default)
         {
             // The text starts inside a string or inline math; there is no leading trivia.
-            leading = [];
             start = _position;
             kind = _resumeState == LineState.InString ? ContinueString() : ContinueInlineMath();
             _resumeState = LineState.Default;
         }
         else
         {
-            leading = ScanTrivia(isTrailing: false);
+            lineBreakBefore = SkipTrivia(isTrailing: false);
             start = _position;
             kind = ScanToken();
         }
-        // Punctuation has fixed text; sharing it avoids an allocation per brace and operator.
-        var tokenText = SyntaxFacts.GetText(kind) ?? Slice(start);
+        // Punctuation has fixed text; words repeat a lot (keys above all), so they are shared too.
+        var tokenText = SyntaxFacts.GetText(kind) ?? Words.Get(text, start, _position - start);
         // The end-of-file token keeps everything in its leading trivia.
-        var trailing = kind == SyntaxKind.EndOfFileToken ? [] : ScanTrivia(isTrailing: true);
-        return new SyntaxToken(kind, start, tokenText, leading, trailing);
+        var lineBreakAfter = kind != SyntaxKind.EndOfFileToken && SkipTrivia(isTrailing: true);
+        return new SyntaxToken(kind, start, tokenText, text, fullStart, _position, lineBreakBefore, lineBreakAfter);
     }
 
     private char Current => Peek(0);
@@ -182,82 +181,101 @@ internal sealed class Lexer(string text, DiagnosticBag diagnostics, LineState in
         return !(c is '!' or '?' && Peek(1) == '=');
     }
 
-    private ImmutableArray<SyntaxTrivia> ScanTrivia(bool isTrailing)
+    /// <summary>Moves past whitespace, comments and line breaks; trailing trivia stops after the first line break.</summary>
+    /// <returns>Whether a line break was passed.</returns>
+    private bool SkipTrivia(bool isTrailing)
     {
-        var trivia = _triviaBuffer;
-        trivia.Clear();
-
+        var lineBreak = false;
         while (!AtEnd)
         {
-            var start = _position;
             var c = Current;
-            SyntaxKind kind;
-
             if (c is '\r' or '\n')
             {
                 _position += c == '\r' && Peek(1) == '\n' ? 2 : 1;
-                kind = SyntaxKind.EndOfLineTrivia;
+                lineBreak = true;
+                if (isTrailing)
+                    break;
             }
             else if (IsWhitespace(c))
             {
                 while (!AtEnd && IsWhitespace(Current))
                     _position++;
-                kind = SyntaxKind.WhitespaceTrivia;
             }
             else if (c == '#')
             {
                 while (!AtEnd && Current is not ('\r' or '\n'))
                     _position++;
-                kind = SyntaxKind.CommentTrivia;
             }
             else
             {
                 break;
             }
-
-            trivia.Add(new SyntaxTrivia(kind, start, Slice(start)));
-
-            // Trailing trivia stops after the first line break.
-            if (isTrailing && kind == SyntaxKind.EndOfLineTrivia)
-                break;
         }
-
-        return trivia.Count == 0 ? [] : trivia.ToImmutable();
+        return lineBreak;
     }
+
+    /// <summary>The trivia between <paramref name="start"/> and <paramref name="end"/>, split the way the lexer reads it.</summary>
+    internal static ImmutableArray<SyntaxTrivia> SplitTrivia(string text, int start, int end)
+    {
+        if (start >= end)
+            return [];
+        var trivia = ImmutableArray.CreateBuilder<SyntaxTrivia>();
+        var position = start;
+        while (position < end)
+        {
+            var from = position;
+            var c = text[position];
+            SyntaxKind kind;
+            if (c is '\r' or '\n')
+            {
+                position += c == '\r' && position + 1 < end && text[position + 1] == '\n' ? 2 : 1;
+                kind = SyntaxKind.EndOfLineTrivia;
+            }
+            else if (IsWhitespace(c))
+            {
+                while (position < end && IsWhitespace(text[position]))
+                    position++;
+                kind = SyntaxKind.WhitespaceTrivia;
+            }
+            else
+            {
+                while (position < end && text[position] is not ('\r' or '\n'))
+                    position++;
+                kind = SyntaxKind.CommentTrivia;
+            }
+            trivia.Add(new SyntaxTrivia(kind, from, text.Substring(from, position - from)));
+        }
+        return trivia.ToImmutable();
+    }
+
+    // Spaces and tabs first: they are nearly all the whitespace there is.
+    private static bool IsWhitespace(char c) =>
+        c is ' ' or '\t' || c == ByteOrderMark || (c < ' ' || c > '~') && char.IsWhiteSpace(c) && c is not ('\r' or '\n');
 
     /// <summary>
-    /// Text from <paramref name="start"/> to the current position. Line breaks and short
-    /// indentation are by far the most common trivia, so they are shared instead of allocated.
+    /// A small shared table of recent words, so a key that appears thousands of times (<c>id</c>,
+    /// <c>focus</c>, <c>add_ideas</c>) is one string rather than thousands. Races only cost a miss.
     /// </summary>
-    private string Slice(int start)
+    private static class Words
     {
-        var length = _position - start;
-        var span = text.AsSpan(start, length);
-        switch (length)
+        private const int MaxLength = 48;
+        private const int Size = 1 << 14;
+        private static readonly string?[] Table = new string?[Size];
+
+        public static string Get(string text, int start, int length)
         {
-            case 1:
-                switch (span[0])
-                {
-                    case '\n': return "\n";
-                    case '\r': return "\r";
-                    case ' ': return " ";
-                    case '\t': return "\t";
-                }
-                break;
-            case 2 when span is "\r\n":
-                return "\r\n";
+            if (length == 0)
+                return "";
+            var span = text.AsSpan(start, length);
+            if (length > MaxLength)
+                return new string(span);
+            var slot = string.GetHashCode(span) & (Size - 1);
+            var known = Table[slot];
+            if (known is not null && span.SequenceEqual(known))
+                return known;
+            var created = new string(span);
+            Table[slot] = created;
+            return created;
         }
-        if (length <= MaxCachedIndent && span.Trim('\t').IsEmpty)
-            return Tabs[length];
-        if (length <= MaxCachedIndent && span.Trim(' ').IsEmpty)
-            return Spaces[length];
-        return text.Substring(start, length);
     }
-
-    private const int MaxCachedIndent = 16;
-    private static readonly string[] Tabs = Enumerable.Range(0, MaxCachedIndent + 1).Select(n => new string('\t', n)).ToArray();
-    private static readonly string[] Spaces = Enumerable.Range(0, MaxCachedIndent + 1).Select(n => new string(' ', n)).ToArray();
-
-    private static bool IsWhitespace(char c) =>
-        c == ByteOrderMark || (char.IsWhiteSpace(c) && c is not ('\r' or '\n'));
 }

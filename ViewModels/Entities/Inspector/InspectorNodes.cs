@@ -5,7 +5,9 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HoI4ModBuilder.Clausewitz.Editing;
+using HoI4ModBuilder.Clausewitz.Syntax;
 using HoI4ModBuilder.Game.Schema;
+using HoI4ModBuilder.Game.Tooltips;
 using HoI4ModBuilder.Game.Validation;
 
 namespace HoI4ModBuilder.ViewModels.Entities.Inspector;
@@ -60,6 +62,21 @@ public interface IInspectorSuggestions
     /// <summary>A human-readable hint for a value, e.g. the localised name of a focus id.</summary>
     string? Describe(string value);
 
+    /// <summary>A modifier or effect in words ("+5.0%" in green, "Political Power: +100."), or null.</summary>
+    IReadOnlyList<TextRun>? Preview(ScriptContext context, PropertySyntax property);
+
+    /// <summary>The game's name of a modifier in the chosen language, or null.</summary>
+    string? ModifierName(string key);
+
+    /// <summary>Whether <paramref name="key"/> takes a state id (picked on the map).</summary>
+    bool TakesState(string key);
+
+    /// <summary>The state an id stands for: "Kiev · Soviet Union"; null if there is none.</summary>
+    string? StateName(string value);
+
+    /// <summary>Opens the map to click a state; <paramref name="apply"/> gets its id.</summary>
+    void PickState(Action<int> apply);
+
     /// <summary>The game's documented commands; empty until the documentation is read.</summary>
     ScriptSchema Schema { get; }
 
@@ -68,8 +85,10 @@ public interface IInspectorSuggestions
 }
 
 /// <summary>A command offered by the picker of a script block.</summary>
-/// <param name="Template">The value it is inserted with, e.g. <c>{ ideology = neutrality popularity = 0.05 }</c>.</param>
-public sealed record CommandChoice(string Name, string Category, string Description, string Template);
+/// <param name="Template">
+/// The value it is inserted with, e.g. <c>{ ideology = neutrality popularity = 0.05 }</c>; null: as the scripts use it.
+/// </param>
+public sealed record CommandChoice(string Name, string Category, string Description, string? Template);
 
 /// <summary>
 /// A field whose value is chosen on the canvas (e.g. clicking the anchor focus) instead of typed.
@@ -94,7 +113,9 @@ public abstract partial class InspectorNode : ViewModelBase
 
     public string Key { get; }
 
-    public string Label { get; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowKey))]
+    public partial string Label { get; set; }
 
     /// <summary>The label is a translation, so the script key is shown next to it.</summary>
     public bool ShowKey => !string.Equals(Key, Label, StringComparison.Ordinal);
@@ -130,6 +151,7 @@ public abstract partial class InspectorNode : ViewModelBase
     /// <summary>The parts every row takes over from a newer build.</summary>
     protected void UpdateCommon(InspectorNode newer)
     {
+        Label = newer.Label;
         Problem = newer.Problem;
         Documentation = newer.Documentation;
     }
@@ -250,6 +272,15 @@ public sealed partial class ScalarNode : InspectorNode
     [ObservableProperty]
     public partial string? Hint { get; set; }
 
+    /// <summary>Set for state ids: opens the map to click the state.</summary>
+    public IRelayCommand? PickStateCommand { get; init; }
+
+    public bool CanPickState => PickStateCommand is not null;
+
+    /// <summary>The value in the game's words and colours: "+5.0%" for a modifier, "Political Power: +100." for an effect.</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<TextRun>? Preview { get; set; }
+
     public string Placeholder => IsMissing ? "не задано" : "";
 
     partial void OnIsCheckedChanged(bool value)
@@ -313,6 +344,7 @@ public sealed partial class ScalarNode : InspectorNode
         UpdateCommon(newer);
         Suggestions = newer.Suggestions;
         Hint = newer.Hint;
+        Preview = newer.Preview;
         // Don't clobber what the user is typing; only follow the script when the field is untouched.
         if (Text.Trim() == _committed || IsBool || IsReadOnly)
             Load(newer._committed);

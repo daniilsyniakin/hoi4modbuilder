@@ -8,6 +8,7 @@ using HoI4ModBuilder.Game.Imaging;
 using HoI4ModBuilder.Models;
 using HoI4ModBuilder.Services;
 using HoI4ModBuilder.ViewModels.Entities;
+using Usages_ = HoI4ModBuilder.Game.Content.Usages;
 
 namespace HoI4ModBuilder.ViewModels;
 
@@ -40,7 +41,23 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
             .ToList();
         Workspace = new ScriptWorkspace(mod.RootPath, path => FindTab(path) as EditorTabViewModel);
         Workspace.History.Changed += (_, _) => OnHistoryChanged();
-        Problems = new ProblemsService(Workspace, Content, Assets, Localisation);
+        // The workspace's own writes (imported sprites, undo) reach the assets without waiting for the watcher.
+        Workspace.Changed += Assets.OnFileChanged;
+        Map = new MapService(Assets.FileSystem, Workspace, Content);
+        Problems = new ProblemsService(Workspace, Content, Assets, Localisation, Map);
+        Tooltips = new TooltipService(Localisation, Content, Workspace, Assets.FileSystem, settings.Settings.GamePath);
+        Technologies = new TechnologyService(Assets.FileSystem, Workspace);
+        _texts = new LocalisationEditor(Workspace, Localisation, mod.Name);
+        Runner = new GameRunner(settings, mod);
+        Runner.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(GameRunner.IsRunning))
+            {
+                RunGameCommand.NotifyCanExecuteChanged();
+                StopGameCommand.NotifyCanExecuteChanged();
+            }
+        };
+        GameLog = new GameLogViewModel(() => Runner.ErrorLogPath, Content, mod.RootPath, OpenFileAtLine, (kind, id) => OpenEntity(kind, id));
         _creator = new EntityCreator(Workspace, Content, platform, mod.Name);
         CreateOptions = EntityTemplates.Creatable
             .Select(kind => new CreateOptionViewModel(kind, EntityCreator.Title(kind), CreateEntityCommand))
@@ -48,13 +65,20 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         ProjectTree.AttachProblems(Problems);
         Problems.Changed += (_, _) => OnProblemsChanged();
         _entityContext = new EntityContext(Workspace, Content, Assets, Localisation,
-            new LocalisationEditor(Workspace, Localisation, mod.Name),
+            _texts,
+            new SpriteImporter(Workspace, Assets, mod.Name),
             Problems,
+            Tooltips,
+            Technologies,
+            Map,
             () => Vocabulary,
             (path, offset) => OpenFile(path, offset),
             (kind, id) => OpenEntity(kind, id),
             RenameAsync,
-            error => StatusMessage = error);
+            error => StatusMessage = error,
+            id => FindUsages(id),
+            (title, label, confirm, placeholder, validate, initial) => platform.PromptAsync(title, label, confirm, placeholder, validate, initial),
+            PickState);
 
         try
         {
@@ -75,10 +99,114 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         _ = Content.LoadAsync();
         _ = Localisation.LoadAsync();
         _ = Problems.LoadAsync(settings.Settings.GamePath);
+        _ = Tooltips.LoadAsync();
+        _ = Technologies.EnsureLoadedAsync();
+        _ = Map.EnsureDataAsync();
+        RestoreSession();
     }
 
     /// <summary>Mistakes found in the mod, for the problems panel and the editors.</summary>
     public ProblemsService Problems { get; }
+
+    /// <summary>Effects and modifiers in words, as the game's tooltips put them.</summary>
+    public TooltipService Tooltips { get; }
+
+    /// <summary>Technologies of the game and the mod.</summary>
+    public TechnologyService Technologies { get; }
+
+    /// <summary>States, countries and the province map.</summary>
+    public MapService Map { get; }
+
+    private readonly LocalisationEditor _texts;
+
+    // ── Databases: tabs over the whole mod rather than one file ──
+
+    /// <summary>All localisation keys of the mod, one column per language.</summary>
+    [RelayCommand]
+    private void OpenLocalisationTable() =>
+        ActivateTool<LocalisationTableTabViewModel>(() =>
+            new LocalisationTableTabViewModel(Workspace, _texts, error => StatusMessage = error, OpenFileAtOffset, CloseTab));
+
+    /// <summary>The technologies of the game and the mod.</summary>
+    [RelayCommand]
+    private void OpenTechnologies() =>
+        ActivateTool<TechnologyDatabaseTabViewModel>(() =>
+            new TechnologyDatabaseTabViewModel(Technologies, Localisation, Assets, Mod.RootPath, (kind, id) => OpenEntity(kind, id), CloseTab));
+
+    /// <summary>The map: owners, cores, buildings — and what the mod does with each state.</summary>
+    [RelayCommand]
+    private void OpenMap() =>
+        ActivateTool<MapTabViewModel>(() =>
+            new MapTabViewModel(Map, Localisation, Content, Mod.RootPath, (kind, id, file) => OpenEntity(kind, id, file), OpenFileAtOffset, CloseTab,
+                state => new EntityCardTabViewModel(_entityContext, ContentKind.State, state.Id.ToString(), state.FullPath, _ => { }),
+                CopyStateToMod));
+
+    /// <summary>The game's file of a state, copied into the mod at the same path: the mod's version replaces it.</summary>
+    private string? CopyStateToMod(Game.Map.StateInfo state)
+    {
+        if (Assets.FileSystem.ToRelative(state.FullPath) is not { } relative)
+            return $"Не вдалося визначити шлях «{state.FullPath}» у грі.";
+        byte[] bytes;
+        try
+        {
+            bytes = File.ReadAllBytes(state.FullPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return $"Не вдалося прочитати «{Path.GetFileName(state.FullPath)}»: {ex.Message}";
+        }
+        var bom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
+        var text = System.Text.Encoding.UTF8.GetString(bytes, bom ? 3 : 0, bytes.Length - (bom ? 3 : 0));
+        using var action = Workspace.Action($"Область {state.Id} у моді");
+        return Workspace.CreateFile(Path.Combine(Mod.RootPath, relative.Replace('/', Path.DirectorySeparatorChar)), text, bom);
+    }
+
+    /// <summary>
+    /// For an editor's field: shows the map, and the state clicked there goes to <paramref name="apply"/>;
+    /// then (or on Esc) back to the editor.
+    /// </summary>
+    public void PickState(Action<int> apply)
+    {
+        var back = ActiveTab;
+        OpenMap();
+        if (ActiveTab is not MapTabViewModel map)
+            return;
+        map.StartPick(
+            id =>
+            {
+                if (back is not null && Tabs.Contains(back))
+                    ActiveTab = back;
+                apply(id);
+            },
+            () =>
+            {
+                if (back is not null && Tabs.Contains(back))
+                    ActiveTab = back;
+            });
+    }
+
+    /// <summary>Shows a state on the map, selected.</summary>
+    public void ShowState(int id)
+    {
+        OpenMap();
+        if (ActiveTab is MapTabViewModel map)
+            map.Select(id);
+    }
+
+    private void OpenFileAtOffset(string path, int? offset) => OpenFile(path, offset);
+
+    private void ActivateTool<T>(Func<T> create) where T : DocumentTabViewModel
+    {
+        if (Tabs.OfType<T>().FirstOrDefault() is { } open)
+            ActiveTab = open;
+        else
+            Activate(create());
+    }
+
+    public DocumentTabViewModel? ActiveToolTab =>
+        ActiveTab is LocalisationTableTabViewModel or TechnologyDatabaseTabViewModel or MapTabViewModel ? ActiveTab : null;
+
+    public bool HasActiveToolTab => ActiveToolTab is not null;
 
     // ── Updates ────────────────────────────────────────────────
 
@@ -127,10 +255,221 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         return new CreationTarget(node.FilePath, kind == ContentKind.Technology ? null : node.Group);
     }
 
-    // ── Problems panel ─────────────────────────────────────────
+    // ── Running the game ───────────────────────────────────────
+
+    public GameRunner Runner { get; }
+
+    /// <summary>The game's error.log, grouped and linked.</summary>
+    public GameLogViewModel GameLog { get; }
+
+    /// <summary>Saves everything and starts the game with this mod; the game log opens to follow it.</summary>
+    [RelayCommand(CanExecute = nameof(CanRunGame))]
+    private void RunGame()
+    {
+        foreach (var tab in Tabs)
+            tab.Flush();
+        StatusMessage = Runner.Start();
+        if (StatusMessage is null)
+            ShowBottomTab(BottomTab.GameLog);
+    }
+
+    private bool CanRunGame() => !Runner.IsRunning;
+
+    [RelayCommand(CanExecute = nameof(CanStopGame))]
+    private void StopGame() => Runner.Stop();
+
+    private bool CanStopGame() => Runner.IsRunning;
+
+    /// <summary>Opens a file of the mod with the caret on a 1-based line (from the game log).</summary>
+    private void OpenFileAtLine(string path, int? line)
+    {
+        int? offset = null;
+        if (line is > 1 && Workspace.ReadText(path) is { } text)
+        {
+            var position = 0;
+            for (var current = 1; current < line && position >= 0; current++)
+                position = text.IndexOf('\n', position) is var next and >= 0 ? next + 1 : -1;
+            offset = position >= 0 ? position : null;
+        }
+        OpenFile(path, offset);
+    }
+
+    // ── Bottom panel: problems and the game log ────────────────
+
+    public enum BottomTab
+    {
+        Problems,
+        GameLog,
+        Usages,
+    }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsProblemsTab), nameof(IsGameLogTab), nameof(IsUsagesTab))]
+    public partial BottomTab ActiveBottomTab { get; set; }
+
+    public bool IsUsagesTab => ActiveBottomTab == BottomTab.Usages;
+
+    [RelayCommand]
+    private void ShowUsagesTab() => ShowBottomTab(BottomTab.Usages);
+
+    // ── Search everywhere (double Shift) ───────────────────────
+
+    public SearchEverywhereViewModel Search => field ??= new SearchEverywhereViewModel(CollectSearchItems);
+
+    [RelayCommand]
+    private void SearchEverywhere()
+    {
+        if (Search.IsOpen)
+            Search.Close();
+        else
+            Search.Open();
+    }
+
+    private static string KindTitle(ContentKind kind) => kind switch
+    {
+        ContentKind.Focus => "Фокус",
+        ContentKind.State => "Область",
+        _ => EntityCreator.Title(kind),
+    };
+
+    /// <summary>What search everywhere looks through: the app's actions, the mod's entities, localisation keys and files.</summary>
+    private IReadOnlyList<SearchItem> CollectSearchItems()
+    {
+        var items = new List<SearchItem>
+        {
+            new(SearchItemKind.Action, "Локалізація", null, "Усі ключі мода за мовами", "Дія", OpenLocalisationTable),
+            new(SearchItemKind.Action, "Технології", null, "Технології гри й мода", "Дія", OpenTechnologies),
+            new(SearchItemKind.Action, "Карта", null, "Власники, ядра, будівлі й що робить мод", "Дія", OpenMap),
+            new(SearchItemKind.Action, "Лог гри", null, "error.log", "Дія", () => ShowBottomTab(BottomTab.GameLog)),
+            new(SearchItemKind.Action, "Проблеми", null, "Помилки й попередження мода", "Дія", () => ShowBottomTab(BottomTab.Problems)),
+            new(SearchItemKind.Action, "Запустити гру з модом", null, "Shift+F10", "Дія", () => RunGameCommand.Execute(null)),
+        };
+
+        // States of the game and the mod: they open on the map.
+        foreach (var state in Map.Data.States)
+        {
+            var key = state.NameKey ?? $"STATE_{state.Id}";
+            var name = Localisation.Text(key) ?? key;
+            var id = state.Id;
+            items.Add(new SearchItem(SearchItemKind.Content, name, id.ToString(), $"{id} · {state.Owner}", "Область",
+                () => ShowState(id), ContentKind: ContentKind.State));
+        }
+
+        foreach (var (file, entries) in Content.Files)
+        {
+            var relative = Workspace.Relative(file);
+            foreach (var entry in ContentParser.Flatten(entries))
+            {
+                var name = Localisation.Text(entry.Id) ?? (entry.Kind == ContentKind.Event ? Localisation.Text(entry.Id + ".t") : null);
+                items.Add(new SearchItem(SearchItemKind.Content, name ?? entry.Id, entry.Id,
+                    name is null ? relative : $"{entry.Id} · {relative}", KindTitle(entry.Kind),
+                    () => OpenEntity(entry.Kind, entry.Id, file), ContentKind: entry.Kind));
+            }
+        }
+
+        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
+        foreach (var file in Directory.EnumerateFiles(Mod.RootPath, "*", options))
+        {
+            if (file.Contains(Path.DirectorySeparatorChar + ".git" + Path.DirectorySeparatorChar))
+                continue;
+            var relative = Workspace.Relative(file);
+            items.Add(new SearchItem(SearchItemKind.File, Path.GetFileName(file), relative, Path.GetDirectoryName(relative)?.Replace('\\', '/'),
+                "Файл", () => OpenFile(file), FileKind: FileKinds.FromPath(file)));
+            if (!Path.GetExtension(file).Equals(".yml", StringComparison.OrdinalIgnoreCase) || Workspace.ReadText(file) is not { } text)
+                continue;
+            foreach (var (key, value) in Game.Localisation.LocalisationIndex.Parse(text))
+            {
+                var path = file;
+                items.Add(new SearchItem(SearchItemKind.Localisation, key, null, Game.Localisation.LocalisationIndex.Clean(value),
+                    "Локалізація", () => OpenFile(path, Workspace.ReadText(path) is { } current
+                        ? Game.Localisation.LocalisationFile.FindValue(current, key)?.Start
+                        : null)));
+            }
+        }
+        return items;
+    }
+
+    // ── Find usages (Alt+F7) ───────────────────────────────────
+
+    /// <summary>Where the last searched id is written.</summary>
+    public UsagesViewModel Usages { get; } = new();
+
+    /// <summary>
+    /// Every place <paramref name="id"/> is written in the mod's scripts and localisation; without an id,
+    /// the selected object of the graphical editor or the content tree.
+    /// </summary>
+    [RelayCommand]
+    public void FindUsages(string? id)
+    {
+        id ??= ActiveEntityTab?.RenameTarget?.Id ?? (ProjectTree.SelectedContentNode is { HasLocation: true } node ? node.Name : null);
+        if (string.IsNullOrWhiteSpace(id))
+            return;
+
+        var files = new List<UsageFileViewModel>();
+        foreach (var file in EnumerateRenameCandidates().OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+        {
+            if (Workspace.ReadText(file) is not { } text || !text.Contains(id, StringComparison.Ordinal))
+                continue;
+            var relative = Workspace.Relative(file);
+            var found = Path.GetExtension(file).Equals(".yml", StringComparison.OrdinalIgnoreCase)
+                ? Usages_.InLocalisation(text, id)
+                : Usages_.InScript(Clausewitz.SyntaxTree.Parse(text), relative, id);
+            var rows = found.Select(usage => UsageRow(file, usage)).ToList();
+            if (rows.Count > 0)
+                files.Add(new UsageFileViewModel(relative, rows));
+        }
+        // Uses first, the definition last: the definition is what one came from.
+        Usages.Show(id, files.OrderBy(f => f.Rows.All(r => r.IsDefinition)).ToList());
+        ShowBottomTab(BottomTab.Usages);
+    }
+
+    private UsageRowViewModel UsageRow(string file, Usage usage)
+    {
+        var openCode = new RelayCommand(() => OpenFile(file, usage.Start));
+        var open = usage.Owner is { } owner && !usage.IsDefinition
+            ? new RelayCommand(() => OpenEntity(owner.Kind, owner.Id, file))
+            : openCode;
+        var name = usage.Owner is { } entity
+            ? Localisation.Text(entity.Id) is { } title ? $"{title} ({entity.Id})" : entity.Id
+            : usage.Context;
+        return new UsageRowViewModel(usage, name, open, openCode);
+    }
+
+    public bool IsProblemsTab => ActiveBottomTab == BottomTab.Problems;
+
+    public bool IsGameLogTab => ActiveBottomTab == BottomTab.GameLog;
 
     [ObservableProperty]
     public partial bool IsProblemsPanelVisible { get; set; }
+
+    /// <summary>Shows a tab of the bottom panel, or hides the panel when that tab is already showing.</summary>
+    private void ToggleBottomTab(BottomTab tab)
+    {
+        if (IsProblemsPanelVisible && ActiveBottomTab == tab)
+            IsProblemsPanelVisible = false;
+        else
+            ShowBottomTab(tab);
+    }
+
+    private void ShowBottomTab(BottomTab tab)
+    {
+        ActiveBottomTab = tab;
+        IsProblemsPanelVisible = true;
+        if (tab == BottomTab.GameLog)
+            GameLog.Reload();
+    }
+
+    [RelayCommand]
+    private void ShowProblemsTab() => ActiveBottomTab = BottomTab.Problems;
+
+    [RelayCommand]
+    private void ShowGameLogTab() => ShowBottomTab(BottomTab.GameLog);
+
+    [RelayCommand]
+    private void HideBottomPanel() => IsProblemsPanelVisible = false;
+
+    [RelayCommand]
+    private void ToggleGameLog() => ToggleBottomTab(BottomTab.GameLog);
 
     public IReadOnlyList<ProblemRowViewModel> ProblemRows { get; private set; } = [];
 
@@ -145,7 +484,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     public bool HasNoProblems => Problems.ErrorCount + Problems.WarningCount == 0;
 
     [RelayCommand]
-    private void ToggleProblemsPanel() => IsProblemsPanelVisible = !IsProblemsPanelVisible;
+    private void ToggleProblemsPanel() => ToggleBottomTab(BottomTab.Problems);
 
     /// <summary>Goes to a problem: the entity's graphical editor, or the code for problems outside entities.</summary>
     [RelayCommand]
@@ -344,7 +683,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Title), nameof(HasActiveTab), nameof(ActiveTextTab), nameof(ActiveImageTab),
-        nameof(HasActiveTextTab), nameof(HasActiveImageTab), nameof(ActiveEntityTab), nameof(HasActiveEntityTab))]
+        nameof(HasActiveTextTab), nameof(HasActiveImageTab), nameof(ActiveEntityTab), nameof(HasActiveEntityTab),
+        nameof(ActiveToolTab), nameof(HasActiveToolTab))]
     public partial DocumentTabViewModel? ActiveTab { get; set; }
 
     partial void OnActiveTabChanged(DocumentTabViewModel? oldValue, DocumentTabViewModel? newValue)
@@ -354,6 +694,74 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
             oldEntity.IsActive = false;
         if (newValue is EntityTabViewModel newEntity)
             newEntity.IsActive = true;
+        if (newValue is not null)
+        {
+            _recentTabs.Remove(newValue);
+            _recentTabs.Insert(0, newValue);
+        }
+    }
+
+    // ── Tab switcher (Ctrl+Tab): tabs by last use, picked while Ctrl is held ──
+
+    // A quick Ctrl+Tab just goes back to the previous tab; the list shows only when Ctrl is held a moment.
+    private static readonly TimeSpan SwitcherDelay = TimeSpan.FromMilliseconds(150);
+
+    private readonly List<DocumentTabViewModel> _recentTabs = [];
+    private DispatcherTimer? _switcherTimer;
+
+    public ObservableCollection<DocumentTabViewModel> SwitcherTabs { get; } = [];
+
+    public bool IsSwitching { get; private set; }
+
+    [ObservableProperty]
+    public partial bool IsSwitcherVisible { get; private set; }
+
+    [ObservableProperty]
+    public partial DocumentTabViewModel? SwitcherSelection { get; set; }
+
+    /// <summary>Opens the switcher on the previous tab, or moves through it.</summary>
+    public void MoveSwitcher(bool back)
+    {
+        if (!IsSwitching)
+        {
+            if (Tabs.Count < 2)
+                return;
+            SwitcherTabs.Clear();
+            foreach (var tab in _recentTabs.Where(Tabs.Contains).Concat(Tabs.Except(_recentTabs)))
+                SwitcherTabs.Add(tab);
+            IsSwitching = true;
+            SwitcherSelection = SwitcherTabs[back ? ^1 : 1];
+            _switcherTimer ??= new DispatcherTimer(SwitcherDelay, DispatcherPriority.Normal, (_, _) =>
+            {
+                _switcherTimer!.Stop();
+                IsSwitcherVisible = IsSwitching;
+            });
+            _switcherTimer.Start();
+            return;
+        }
+        var index = SwitcherSelection is null ? 0 : SwitcherTabs.IndexOf(SwitcherSelection);
+        var count = SwitcherTabs.Count;
+        SwitcherSelection = SwitcherTabs[((index + (back ? -1 : 1)) % count + count) % count];
+    }
+
+    /// <summary>Ctrl released (or a row clicked): goes to the chosen tab.</summary>
+    public void CommitSwitcher()
+    {
+        if (!IsSwitching)
+            return;
+        var chosen = SwitcherSelection;
+        CloseSwitcher();
+        if (chosen is not null && Tabs.Contains(chosen))
+            ActiveTab = chosen;
+    }
+
+    public void CloseSwitcher()
+    {
+        _switcherTimer?.Stop();
+        IsSwitching = false;
+        IsSwitcherVisible = false;
+        SwitcherSelection = null;
+        SwitcherTabs.Clear();
     }
 
     public EntityTabViewModel? ActiveEntityTab => ActiveTab as EntityTabViewModel;
@@ -670,6 +1078,88 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         NavigationRequested?.Invoke(textTab, value);
     }
 
+    // ── Session: what was open, restored on the next start ─────
+
+    public SettingsStore Settings => _settings;
+
+    private string SessionKey => Paths.Normalize(Mod.RootPath).ToLowerInvariant();
+
+    // Tabs come back once the content is indexed (graphical editors need it); until then the saved ones stand.
+    private bool _tabsRestored;
+
+    private void RestoreSession()
+    {
+        if (!_settings.Settings.Sessions.TryGetValue(SessionKey, out var session))
+        {
+            _tabsRestored = true;
+            return;
+        }
+        ProjectTree.Mode = session.ContentMode ? ProjectViewMode.Content : ProjectViewMode.Files;
+        IsProjectPanelVisible = session.ProjectPanelVisible;
+        ActiveBottomTab = session.BottomTab == nameof(BottomTab.GameLog) ? BottomTab.GameLog : BottomTab.Problems;
+        IsProblemsPanelVisible = session.BottomPanelVisible;
+
+        void OnContentLoaded(object? sender, EventArgs e)
+        {
+            Content.Changed -= OnContentLoaded;
+            RestoreTabs(session);
+        }
+        Content.Changed += OnContentLoaded;
+    }
+
+    private void RestoreTabs(ModSession session)
+    {
+        DocumentTabViewModel? active = null;
+        for (var i = 0; i < session.Tabs.Count; i++)
+        {
+            var saved = session.Tabs[i];
+            var count = Tabs.Count;
+            if (saved.Tool == "localisation")
+                OpenLocalisationTable();
+            else if (saved.Tool == "technologies")
+                OpenTechnologies();
+            else if (saved.Tool == "map")
+                OpenMap();
+            else if (saved.Path is { } path && File.Exists(path))
+                OpenFile(path, saved.Caret);
+            else if (Enum.TryParse<ContentKind>(saved.Kind, out var kind) && saved.Id is { } id)
+                OpenEntity(kind, id);
+            if (i == session.ActiveTab && Tabs.Count > count)
+                active = Tabs[^1];
+        }
+        if (active is not null)
+            ActiveTab = active;
+        StatusMessage = null; // a tab that is gone is not worth a message
+        _tabsRestored = true;
+    }
+
+    /// <summary>Remembers the tree mode, panels and open tabs of this mod.</summary>
+    public void SaveSession()
+    {
+        var sessions = _settings.Settings.Sessions;
+        var session = sessions.GetValueOrDefault(SessionKey) ?? new ModSession();
+        session.ContentMode = ProjectTree.IsContentMode;
+        session.ProjectPanelVisible = IsProjectPanelVisible;
+        session.BottomPanelVisible = IsProblemsPanelVisible;
+        session.BottomTab = ActiveBottomTab.ToString();
+        if (_tabsRestored)
+        {
+            session.Tabs = Tabs.Select(t => t switch
+                {
+                    EntityTabViewModel entity => new SessionTab { Kind = entity.EntityContentKind.ToString(), Id = entity.EntityId },
+                    LocalisationTableTabViewModel => new SessionTab { Tool = "localisation" },
+                    TechnologyDatabaseTabViewModel => new SessionTab { Tool = "technologies" },
+                    MapTabViewModel => new SessionTab { Tool = "map" },
+                    EditorTabViewModel text => new SessionTab { Path = text.FilePath, Caret = text.SavedCaretOffset },
+                    _ => new SessionTab { Path = t.FilePath },
+                })
+                .ToList();
+            session.ActiveTab = ActiveTab is null ? -1 : Tabs.IndexOf(ActiveTab);
+        }
+        sessions[SessionKey] = session;
+        _settings.Save();
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -712,6 +1202,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         else
             tab.Dispose();
 
+        _recentTabs.Remove(tab);
         var index = Tabs.IndexOf(tab);
         if (index < 0)
             return;

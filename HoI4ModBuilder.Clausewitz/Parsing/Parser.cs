@@ -24,36 +24,35 @@ namespace HoI4ModBuilder.Clausewitz.Parsing;
 internal sealed class Parser
 {
     private readonly string _text;
-    private readonly ImmutableArray<SyntaxToken> _tokens;
+    private readonly Lexer _lexer;
     private readonly DiagnosticBag _diagnostics;
-    private readonly List<BlockSyntax> _closedBlocks = [];
     private readonly List<SyntaxToken> _unclosedBraces = [];
-    private int _index;
+    // Statement lists being collected, one per nesting depth, reused from block to block.
+    private readonly List<List<StatementSyntax>> _statementLists = [];
+    private int _depth;
+    private SyntaxToken _current;
+    private SyntaxToken? _next;
 
     public Parser(string text, DiagnosticBag diagnostics)
     {
         _text = text;
         _diagnostics = diagnostics;
-        var lexer = new Lexer(text, diagnostics);
-        var tokens = ImmutableArray.CreateBuilder<SyntaxToken>();
-        SyntaxToken token;
-        do
-        {
-            token = lexer.Lex();
-            tokens.Add(token);
-        } while (token.Kind != SyntaxKind.EndOfFileToken);
-        _tokens = tokens.ToImmutable();
+        // Tokens are read as the parser goes, with one of lookahead.
+        _lexer = new Lexer(text, diagnostics);
+        _current = _lexer.Lex();
     }
 
-    private SyntaxToken Current => _tokens[_index];
+    private SyntaxToken Current => _current;
 
-    private SyntaxToken Peek(int offset) => _tokens[Math.Min(_index + offset, _tokens.Length - 1)];
+    /// <summary>The token after <see cref="Current"/> (the end-of-file token repeats).</summary>
+    private SyntaxToken PeekNext() =>
+        _next ??= _current.Kind == SyntaxKind.EndOfFileToken ? _current : _lexer.Lex();
 
     public ScriptFileSyntax ParseFile()
     {
         var statements = ParseStatements(insideBlock: false);
         var file = new ScriptFileSyntax(statements, NextToken());
-        ReportUnclosedBlocks();
+        ReportUnclosedBlocks(file);
         return file;
     }
 
@@ -64,12 +63,14 @@ internal sealed class Parser
     /// <c>{</c> most likely stole a brace meant for its parent. The earliest such block is
     /// where the user forgot to close.
     /// </summary>
-    private void ReportUnclosedBlocks()
+    private void ReportUnclosedBlocks(ScriptFileSyntax file)
     {
         if (_unclosedBraces.Count == 0)
             return;
 
-        var suspects = _closedBlocks
+        var suspects = file.DescendantNodes()
+            .OfType<BlockSyntax>()
+            .Where(b => !b.CloseBrace.IsMissing)
             .Where(HasMismatchedIndentation)
             .OrderBy(b => b.CloseBrace.Position)
             .Select(b => b.OpenBrace)
@@ -110,15 +111,34 @@ internal sealed class Parser
 
     private SyntaxToken NextToken()
     {
-        var token = Current;
-        if (_index < _tokens.Length - 1)
-            _index++;
+        var token = _current;
+        if (token.Kind != SyntaxKind.EndOfFileToken)
+        {
+            _current = _next ?? _lexer.Lex();
+            _next = null;
+        }
         return token;
     }
 
     private ImmutableArray<StatementSyntax> ParseStatements(bool insideBlock)
     {
-        var statements = ImmutableArray.CreateBuilder<StatementSyntax>();
+        if (_statementLists.Count == _depth)
+            _statementLists.Add([]);
+        var statements = _statementLists[_depth++];
+        statements.Clear();
+        try
+        {
+            CollectStatements(statements, insideBlock);
+            return statements.Count == 0 ? [] : [.. statements];
+        }
+        finally
+        {
+            _depth--;
+        }
+    }
+
+    private void CollectStatements(List<StatementSyntax> statements, bool insideBlock)
+    {
         while (Current.Kind != SyntaxKind.EndOfFileToken)
         {
             var kind = Current.Kind;
@@ -139,7 +159,6 @@ internal sealed class Parser
                 statements.Add(ParseStatement());
             }
         }
-        return statements.ToImmutable();
     }
 
     private StatementSyntax ParseStatement()
@@ -168,7 +187,7 @@ internal sealed class Parser
         {
             // "cost =" followed by "completion_reward = {" on the next line: the value was
             // forgotten, and the word is really the next property's key.
-            case SyntaxKind.WordToken when SyntaxFacts.IsOperator(Peek(1).Kind)
+            case SyntaxKind.WordToken when SyntaxFacts.IsOperator(PeekNext().Kind)
                                            && (op.HasLineBreakInTrailingTrivia || Current.HasLineBreakInLeadingTrivia):
                 _diagnostics.MissingValue(op.Span, op.Text);
                 return new ScalarSyntax(SyntaxToken.Missing(SyntaxKind.WordToken, Current.FullSpan.Start));
@@ -193,11 +212,7 @@ internal sealed class Parser
         var statements = ParseStatements(insideBlock: true);
 
         if (Current.Kind == SyntaxKind.CloseBraceToken)
-        {
-            var block = new BlockSyntax(open, statements, NextToken());
-            _closedBlocks.Add(block);
-            return block;
-        }
+            return new BlockSyntax(open, statements, NextToken());
 
         // Reported at the end, once we can guess where the brace is really missing.
         _unclosedBraces.Add(open);

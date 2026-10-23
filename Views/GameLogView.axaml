@@ -1,0 +1,142 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HoI4ModBuilder.ViewModels"
+             xmlns:views="using:HoI4ModBuilder.Views"
+             x:Class="HoI4ModBuilder.Views.GameLogView"
+             x:DataType="vm:GameLogViewModel">
+  <UserControl.Styles>
+    <Style Selector="ToggleButton.filter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="8,3" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ToggleButton.filter:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource PressedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.filter:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    </Style>
+    <Style Selector="Border.count">
+      <Setter Property="Background" Value="{DynamicResource PressedBrush}" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="6,0" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+      <Setter Property="Margin" Value="8,1,0,0" />
+    </Style>
+    <Style Selector="Border.mod-tag">
+      <Setter Property="Background" Value="#223574F0" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Padding" Value="4,0" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+      <Setter Property="Margin" Value="0,1,8,0" />
+    </Style>
+    <Style Selector="TextBlock.log">
+      <Setter Property="FontFamily" Value="{StaticResource EditorFont}" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="ListBox.log ListBoxItem">
+      <Setter Property="Padding" Value="6,3" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ToggleButton.expander">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="3" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style Selector="ToggleButton.expander PathIcon">
+      <Setter Property="RenderTransform" Value="rotate(-90deg)" />
+    </Style>
+    <Style Selector="ToggleButton.expander:checked PathIcon">
+      <Setter Property="RenderTransform" Value="none" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <Grid DockPanel.Dock="Top" Height="32" Margin="6,0,10,0" ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto">
+      <!-- Run and stop the game -->
+      <Button Classes="flat" Padding="6,4" MinHeight="0"
+              Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RunGameCommand}"
+              ToolTip.Tip="Запустити гру з модом (Shift+F10)">
+        <PathIcon Data="{StaticResource IconPlay}" Width="12" Height="12" Foreground="{DynamicResource SuccessBrush}" />
+      </Button>
+      <Button Grid.Column="1" Classes="flat" Padding="6,4" MinHeight="0"
+              Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).StopGameCommand}"
+              ToolTip.Tip="Зупинити гру (Ctrl+F2)">
+        <PathIcon Data="{StaticResource IconStop}" Width="11" Height="11" Foreground="{DynamicResource ErrorBrush}" />
+      </Button>
+      <Border Grid.Column="2" Width="1" Height="16" Margin="8,0" Background="{DynamicResource SeparatorBrush}" />
+      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+        <ToggleButton Classes="filter" IsChecked="{Binding ShowMod}" ToolTip.Tip="Про файли й об'єкти цього мода">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="Мод" />
+            <TextBlock Text="{Binding ModCount}" Classes="secondary" />
+          </StackPanel>
+        </ToggleButton>
+        <ToggleButton Classes="filter" IsChecked="{Binding ShowGame}" ToolTip.Tip="Гра та інші моди">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="Гра" />
+            <TextBlock Text="{Binding GameCount}" Classes="secondary" />
+          </StackPanel>
+        </ToggleButton>
+        <TextBox Text="{Binding Search}" PlaceholderText="Пошук" Width="220" Margin="8,0,0,0" MinHeight="0" Padding="8,3" />
+      </StackPanel>
+      <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+        <TextBlock Text="{Binding FileInfo}" Classes="secondary" FontSize="11" VerticalAlignment="Center" />
+        <Button Classes="flat" Padding="5" MinHeight="0" Command="{Binding RefreshCommand}" ToolTip.Tip="Перечитати">
+          <PathIcon Data="{StaticResource IconSwap}" Width="11" Height="11" />
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <Panel>
+      <ListBox Classes="log" ItemsSource="{Binding Groups}" Background="Transparent">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:LogGroupViewModel">
+            <StackPanel>
+              <Grid ColumnDefinitions="22,Auto,*,Auto">
+                <ToggleButton Classes="expander" IsChecked="{Binding IsExpanded}" IsVisible="{Binding !IsSingle}">
+                  <PathIcon Data="{StaticResource IconChevronDown}" Width="9" Height="9" />
+                </ToggleButton>
+                <Border Grid.Column="1" Classes="mod-tag" IsVisible="{Binding IsMod}">
+                  <TextBlock Text="мод" FontSize="11" Foreground="{DynamicResource AccentHoverBrush}" />
+                </Border>
+                <views:LinkedText LinkBrush="{DynamicResource AccentHoverBrush}" Grid.Column="2" Classes="log" Segments="{Binding First.Segments}" IsVisible="{Binding IsSingle}" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsSingle}">
+                  <TextBlock Classes="log" Text="{Binding Pattern}" TextWrapping="Wrap" />
+                  <TextBlock Classes="secondary" FontSize="11" Text="{Binding VariantsText}" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                  <Border Classes="count" IsVisible="{Binding IsRepeated}">
+                    <TextBlock Text="{Binding CountText}" FontSize="11" />
+                  </Border>
+                  <TextBlock Text="{Binding Source}" Classes="secondary" FontSize="11" Margin="10,1,0,0" VerticalAlignment="Top" />
+                </StackPanel>
+              </Grid>
+              <ItemsControl ItemsSource="{Binding Messages}" IsVisible="{Binding IsExpanded}" Margin="30,2,0,2">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:LogMessageViewModel">
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                      <views:LinkedText LinkBrush="{DynamicResource AccentHoverBrush}" Classes="log" Segments="{Binding Segments}" />
+                      <Border Grid.Column="1" Classes="count" IsVisible="{Binding IsRepeated}">
+                        <TextBlock Text="{Binding CountText}" FontSize="11" />
+                      </Border>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+      <TextBlock Text="Помилок немає" Classes="secondary" HorizontalAlignment="Center" VerticalAlignment="Center"
+                 IsVisible="{Binding IsEmpty}" />
+    </Panel>
+  </DockPanel>
+</UserControl>

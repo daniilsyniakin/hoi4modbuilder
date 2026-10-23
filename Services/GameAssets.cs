@@ -17,6 +17,8 @@ public sealed class GameAssets
     private static readonly TimeSpan ReloadDelay = TimeSpan.FromMilliseconds(500);
 
     private readonly DispatcherTimer _reloadTimer;
+    private readonly HashSet<string> _changedGfx = new(StringComparer.OrdinalIgnoreCase);
+    private bool _fullReload;
 
     public GameAssets(string? gamePath, string modRoot)
     {
@@ -25,7 +27,7 @@ public sealed class GameAssets
         _reloadTimer.Tick += async (_, _) =>
         {
             _reloadTimer.Stop();
-            await LoadSpritesAsync();
+            await ReloadChangedAsync();
         };
     }
 
@@ -53,10 +55,40 @@ public sealed class GameAssets
         }
         else if (Path.GetExtension(fullPath).Equals(".gfx", StringComparison.OrdinalIgnoreCase))
         {
-            // Saving a .gfx can fire several events; reload once they settle.
-            _reloadTimer.Stop();
-            _reloadTimer.Start();
+            if (FileSystem.ToRelative(fullPath) is { } relative)
+                _changedGfx.Add(relative);
+            ScheduleReload();
         }
+        else if (Directory.Exists(fullPath))
+        {
+            // A new or renamed folder may hold .gfx files the watcher never reports one by one.
+            _fullReload = true;
+            ScheduleReload();
+        }
+    }
+
+    // Saving can fire several events; reload once they settle.
+    private void ScheduleReload()
+    {
+        _reloadTimer.Stop();
+        _reloadTimer.Start();
+    }
+
+    /// <summary>Re-reads just the .gfx files that changed; the whole catalog only when a folder changed.</summary>
+    private async Task ReloadChangedAsync()
+    {
+        if (_fullReload)
+        {
+            _fullReload = false;
+            _changedGfx.Clear();
+            await LoadSpritesAsync();
+            return;
+        }
+        var changed = _changedGfx.ToList();
+        _changedGfx.Clear();
+        var catalog = Sprites;
+        Sprites = await Task.Run(() => changed.Aggregate(catalog, (c, file) => c.WithFile(FileSystem, file)));
+        SpritesChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>The image a sprite shows: its texture, cut to the first frame for multi-frame sprites.</summary>
