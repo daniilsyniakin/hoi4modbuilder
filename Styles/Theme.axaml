@@ -353,6 +353,20 @@
     <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
     <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
   </Style>
+  <!-- The tab strip's scroll bar stays thin under the pointer instead of growing over the tabs -->
+  <Style Selector="ListBox.tabs ScrollBar[IsExpanded=true] /template/ Thumb">
+    <Setter Property="RenderTransform" Value="{DynamicResource HorizontalSmallScrollThumbScaleTransform}" />
+  </Style>
+  <Style Selector="ListBox.tabs ScrollBar[IsExpanded=true] /template/ Grid#Root">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="ListBox.tabs ScrollBar[IsExpanded=true] /template/ Rectangle#TrackRect">
+    <Setter Property="Opacity" Value="0" />
+  </Style>
+  <Style Selector="ListBox.tabs ScrollBar /template/ RepeatButton">
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+  </Style>
   <Style Selector="ListBox.tabs ListBoxItem">
     <Setter Property="Padding" Value="0" />
     <Setter Property="Margin" Value="0" />

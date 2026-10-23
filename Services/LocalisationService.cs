@@ -1,4 +1,5 @@
 using Avalonia.Threading;
+using HoI4ModBuilder.Game.Content;
 using HoI4ModBuilder.Game.FileSystem;
 using HoI4ModBuilder.Game.Localisation;
 
@@ -55,8 +56,33 @@ public sealed class LocalisationService
         return LoadAsync();
     }
 
-    /// <summary>Raised on the UI thread whenever <see cref="Index"/> is replaced.</summary>
+    /// <summary>
+    /// Ids instead of names everywhere names are shown, while Right Alt is held. Only <see cref="Text"/>
+    /// follows it: editing and checking texts goes through <see cref="Index"/>.
+    /// </summary>
+    public bool ShowIds
+    {
+        get;
+        set
+        {
+            if (field == value)
+                return;
+            field = value;
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>Raised on the UI thread whenever <see cref="Index"/> is replaced or edited.</summary>
+    public event EventHandler? IndexChanged;
+
+    /// <summary>Raised on the UI thread whenever shown names may differ: the index changed or <see cref="ShowIds"/> did.</summary>
     public event EventHandler? Changed;
+
+    private void OnIndexChanged()
+    {
+        IndexChanged?.Invoke(this, EventArgs.Empty);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
 
     public async Task LoadAsync()
     {
@@ -67,7 +93,7 @@ public sealed class LocalisationService
         if (language != Language)
             return; // switched again while loading
         Index = index;
-        Changed?.Invoke(this, EventArgs.Empty);
+        OnIndexChanged();
     }
 
     public void OnFileChanged(string fullPath)
@@ -82,9 +108,19 @@ public sealed class LocalisationService
     public void Apply(string key, string storedValue)
     {
         Index.Set(key, storedValue);
-        Changed?.Invoke(this, EventArgs.Empty);
+        OnIndexChanged();
     }
 
     /// <summary>The display text for <paramref name="key"/>, or null when there is none.</summary>
-    public string? Text(string? key) => Index.FindDisplay(key);
+    public string? Text(string? key) => ShowIds ? null : Index.FindDisplay(key);
+
+    /// <summary>What the game calls a mod entity; null when it has no name in this language.</summary>
+    public string? TitleOf(ContentEntry entry) => entry.Kind switch
+    {
+        ContentKind.State => Text(entry.Detail ?? $"STATE_{entry.Id}"),
+        ContentKind.Event => Text(entry.Id) ?? Text(entry.Id + ".t"),
+        // Their ids are names only for the script; a localisation key with the same name would be a coincidence.
+        ContentKind.ScriptedEffect or ContentKind.ScriptedTrigger => null,
+        _ => Text(entry.Id),
+    };
 }

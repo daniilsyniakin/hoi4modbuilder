@@ -24,6 +24,8 @@
     <Style Selector="Grid.row.missing TextBlock.label">
       <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
       <Setter Property="FontStyle" Value="Italic" />
+      <!-- The slanted glyphs reach past the text's width: room for the last letter -->
+      <Setter Property="Padding" Value="0,0,3,0" />
     </Style>
     <Style Selector="Grid.row">
       <Setter Property="Background" Value="Transparent" />

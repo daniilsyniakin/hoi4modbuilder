@@ -41,7 +41,7 @@ public sealed class ProblemsService
 
         workspace.Changed += _ => Schedule();
         content.Changed += (_, _) => Schedule();
-        localisation.Changed += (_, _) => Schedule();
+        localisation.IndexChanged += (_, _) => Schedule();
         assets.SpritesChanged += (_, _) => Schedule();
         map.Changed += (_, _) =>
         {

@@ -64,7 +64,7 @@
           <PathIcon Data="{StaticResource IconStop}" Width="11" Height="11" Foreground="{DynamicResource ErrorBrush}" />
         </Button>
       </StackPanel>
-      <Menu Classes="main">
+      <Menu x:Name="MainMenu" Classes="main">
         <MenuItem Header="_Файл">
           <MenuItem Header="_Новий мод…" Command="{Binding NewModCommand}"
                     InputGesture="Ctrl+Shift+N">
@@ -382,7 +382,7 @@
                     <PathIcon Width="14" Height="14" VerticalAlignment="Center"
                               Data="{Binding Kind, Converter={x:Static conv:ContentIcons.Geometry}}"
                               Foreground="{Binding Kind, Converter={x:Static conv:ContentIcons.Brush}}" />
-                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Classes.secondary="{Binding IsEmpty}"
+                    <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" Classes.secondary="{Binding IsEmpty}"
                                Classes.error="{Binding HasError}" Classes.warning="{Binding HasWarning}" />
                     <TextBlock Text="{Binding Description}" Classes="secondary" VerticalAlignment="Center"
                                IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />

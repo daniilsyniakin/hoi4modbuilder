@@ -29,7 +29,8 @@ public sealed partial class ProjectTreeViewModel : ViewModelBase
         _root.IsExpanded = true;
 
         _content = content;
-        _contentBuilder = new ContentTreeBuilder(mod.RootPath, (kind, id) => _problems?.WorstFor(kind, id));
+        _contentBuilder = new ContentTreeBuilder(mod.RootPath, (kind, id) => _problems?.WorstFor(kind, id),
+            entry => _localisation?.TitleOf(entry));
         _content.Changed += (_, _) =>
         {
             RebuildContent();
@@ -44,6 +45,15 @@ public sealed partial class ProjectTreeViewModel : ViewModelBase
     {
         _problems = problems;
         problems.Changed += (_, _) => RebuildContent();
+    }
+
+    private LocalisationService? _localisation;
+
+    /// <summary>Names entities in the chosen localisation language.</summary>
+    public void AttachLocalisation(LocalisationService localisation)
+    {
+        _localisation = localisation;
+        localisation.Changed += (_, _) => RebuildContent();
     }
 
     private void RebuildContent() => ContentNodeViewModel.Sync(ContentRoots, _contentBuilder.Build(_content.Files));

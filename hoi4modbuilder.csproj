@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>HoI4ModBuilder</AssemblyName>
     <RootNamespace>HoI4ModBuilder</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.2.1</Version>
     <!-- Where updates come from; the release workflow passes the repository it builds. -->
     <RepositoryUrl Condition="'$(RepositoryUrl)' == ''">https://github.com/daniilsyniakin/hoi4modbuilder</RepositoryUrl>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>

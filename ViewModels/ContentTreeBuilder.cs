@@ -4,7 +4,9 @@ namespace HoI4ModBuilder.ViewModels;
 
 /// <summary>Arranges the mod's entities into the categories and virtual folders of the "Контент" view.</summary>
 /// <param name="severity">The worst problem of an entity, from the mod check.</param>
-internal sealed class ContentTreeBuilder(string rootPath, Func<ContentKind, string, Game.Validation.ProblemSeverity?> severity)
+/// <param name="title">An entity's localised name, if it has one.</param>
+internal sealed class ContentTreeBuilder(string rootPath, Func<ContentKind, string, Game.Validation.ProblemSeverity?> severity,
+    Func<ContentEntry, string?> title)
 {
     private sealed record Located(ContentEntry Entry, string FilePath);
 
@@ -128,6 +130,7 @@ internal sealed class ContentTreeBuilder(string rootPath, Func<ContentKind, stri
             var occurrence = seen[item.Entry.Id] = seen.GetValueOrDefault(item.Entry.Id) + 1;
             return new ContentNodeViewModel(occurrence == 1 ? item.Entry.Id : $"{item.Entry.Id}#{occurrence}", item.Entry.Id, item.Entry.Kind)
             {
+                Title = title(item.Entry),
                 Description = item.Entry.Detail,
                 FilePath = item.FilePath,
                 Position = item.Entry.Position,

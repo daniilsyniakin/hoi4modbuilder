@@ -21,7 +21,15 @@ public sealed partial class ContentNodeViewModel : ViewModelBase
     /// <summary>Identifies the node among its siblings across rebuilds, so expansion and selection survive.</summary>
     public string Key { get; }
 
+    /// <summary>The entity's id, or the title of a category or folder.</summary>
     public string Name { get; }
+
+    /// <summary>The entity's name in the chosen localisation language; null when it has none.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayName))]
+    public partial string? Title { get; set; }
+
+    public string DisplayName => Title ?? Name;
 
     /// <summary>The entity kind (or the kind a category holds); null for virtual folders.</summary>
     public ContentKind? Kind { get; }
@@ -110,6 +118,7 @@ public sealed partial class ContentNodeViewModel : ViewModelBase
 
     private ContentNodeViewModel CopyFrom(ContentNodeViewModel source)
     {
+        Title = source.Title;
         Description = source.Description;
         FilePath = source.FilePath;
         Position = source.Position;

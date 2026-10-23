@@ -63,6 +63,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
             .Select(kind => new CreateOptionViewModel(kind, EntityCreator.Title(kind), CreateEntityCommand))
             .ToList();
         ProjectTree.AttachProblems(Problems);
+        ProjectTree.AttachLocalisation(Localisation);
         Problems.Changed += (_, _) => OnProblemsChanged();
         _entityContext = new EntityContext(Workspace, Content, Assets, Localisation,
             _texts,
@@ -360,7 +361,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
             var relative = Workspace.Relative(file);
             foreach (var entry in ContentParser.Flatten(entries))
             {
-                var name = Localisation.Text(entry.Id) ?? (entry.Kind == ContentKind.Event ? Localisation.Text(entry.Id + ".t") : null);
+                var name = Localisation.TitleOf(entry);
                 items.Add(new SearchItem(SearchItemKind.Content, name ?? entry.Id, entry.Id,
                     name is null ? relative : $"{entry.Id} · {relative}", KindTitle(entry.Kind),
                     () => OpenEntity(entry.Kind, entry.Id, file), ContentKind: entry.Kind));
@@ -1032,6 +1033,34 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
             CloseTab(ActiveTab);
     }
 
+    /// <summary>
+    /// The tabs to the left (<paramref name="left"/>) or right of <paramref name="tab"/>: all of them,
+    /// or only the nearest one.
+    /// </summary>
+    public IReadOnlyList<DocumentTabViewModel> TabsBeside(DocumentTabViewModel tab, bool left, bool all)
+    {
+        var index = Tabs.IndexOf(tab);
+        if (index < 0)
+            return [];
+        var beside = left ? Tabs.Take(index).ToList() : Tabs.Skip(index + 1).ToList();
+        if (all || beside.Count == 0)
+            return beside;
+        return [left ? beside[^1] : beside[0]];
+    }
+
+    public void CloseTabs(IEnumerable<DocumentTabViewModel> tabs)
+    {
+        foreach (var tab in tabs.ToList())
+            CloseTab(tab);
+    }
+
+    /// <summary>Closes all tabs but <paramref name="keep"/>, which becomes the active one.</summary>
+    public void CloseOtherTabs(DocumentTabViewModel keep)
+    {
+        ActiveTab = keep;
+        CloseTabs(Tabs.Where(t => t != keep));
+    }
+
     /// <param name="offset">Where to put the caret in a text file; null keeps the last position.</param>
     public void OpenFile(string path, int? offset = null)
     {
@@ -1206,8 +1235,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         var index = Tabs.IndexOf(tab);
         if (index < 0)
             return;
+        // Asked before removing: the tab strip clears its selection, and with it ActiveTab, on removal.
+        var wasActive = ActiveTab == tab;
         Tabs.RemoveAt(index);
-        if (ActiveTab == tab)
+        if (wasActive)
             ActiveTab = Tabs.Count == 0 ? null : Tabs[Math.Min(index, Tabs.Count - 1)];
     }
 

@@ -68,7 +68,7 @@ public abstract partial class EntityTabViewModel : DocumentTabViewModel
         };
         context.Workspace.Changed += OnSourceChanged;
         context.Content.Changed += OnServiceChanged;
-        context.Localisation.Changed += OnServiceChanged;
+        context.Localisation.Changed += OnLocalisationChanged;
         context.Assets.SpritesChanged += OnServiceChanged;
         context.Problems.Changed += OnServiceChanged;
         context.Tooltips.Changed += OnServiceChanged;
@@ -159,7 +159,7 @@ public abstract partial class EntityTabViewModel : DocumentTabViewModel
         _refreshTimer.Stop();
         Context.Workspace.Changed -= OnSourceChanged;
         Context.Content.Changed -= OnServiceChanged;
-        Context.Localisation.Changed -= OnServiceChanged;
+        Context.Localisation.Changed -= OnLocalisationChanged;
         Context.Assets.SpritesChanged -= OnServiceChanged;
         Context.Problems.Changed -= OnServiceChanged;
         Context.Tooltips.Changed -= OnServiceChanged;
@@ -175,6 +175,23 @@ public abstract partial class EntityTabViewModel : DocumentTabViewModel
     }
 
     private void OnServiceChanged(object? sender, EventArgs e) => ScheduleRefresh();
+
+    private bool _showsIds;
+
+    // Ids appear and go away with Right Alt at once, not after the usual delay.
+    private void OnLocalisationChanged(object? sender, EventArgs e)
+    {
+        if (_showsIds == Context.Localisation.ShowIds)
+        {
+            ScheduleRefresh();
+            return;
+        }
+        _showsIds = Context.Localisation.ShowIds;
+        if (_isActive)
+            RefreshNow();
+        else
+            _stale = true;
+    }
 
     // ── Helpers for subclasses ────────────────────────────────
 

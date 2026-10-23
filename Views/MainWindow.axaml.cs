@@ -50,6 +50,7 @@ public partial class MainWindow : Window
         ContentTreeView.AddHandler(DoubleTappedEvent, OnContentTreeDoubleTapped, handledEventsToo: true);
         ContentTreeView.KeyDown += OnContentTreeKeyDown;
         TabStrip.PointerReleased += OnTabStripPointerReleased;
+        TabStrip.AddHandler(PointerPressedEvent, OnTabStripPointerPressed, RoutingStrategies.Tunnel);
         ProblemsList.DoubleTapped += (_, _) => _viewModel?.OpenProblemCommand.Execute(ProblemsList.SelectedItem as ProblemRowViewModel);
         ProblemsList.KeyDown += (_, e) =>
         {
@@ -62,7 +63,12 @@ public partial class MainWindow : Window
         {
             _viewModel?.CloseSwitcher();
             _viewModel?.Search.Close();
+            // The key-up goes to another window.
+            _viewModel?.Localisation.ShowIds = false;
         };
+        // Ctrl+click: usages of the word or the object clicked, without selecting it and pressing Alt+F7.
+        Editor.TextArea.AddHandler(PointerPressedEvent, OnEditorCtrlClick, RoutingStrategies.Tunnel);
+        ContentTreeView.AddHandler(PointerPressedEvent, OnContentTreeCtrlClick, RoutingStrategies.Tunnel);
         SwitcherList.Tapped += (_, _) => _viewModel?.CommitSwitcher();
         SearchResults.Tapped += (_, _) => _viewModel?.Search.Commit();
         SearchBox.KeyDown += OnSearchKeyDown;
@@ -359,6 +365,14 @@ public partial class MainWindow : Window
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         TrackDoubleShift(e, down: true);
+        // Right Alt held: ids instead of names in the content tree and the editors. Not while typing:
+        // it is also AltGr (ґ on the Ukrainian layout), and the editors would rebuild under the caret.
+        if (e.Key == Key.RightAlt && _viewModel is not null && FocusManager?.GetFocusedElement() is not (TextBox or TextArea))
+        {
+            e.Handled = true;
+            _viewModel.Localisation.ShowIds = true;
+            return;
+        }
         // Alt+F7: usages of the word under the caret in the text editor, else of the selected object.
         if (e.Key == Key.F7 && e.KeyModifiers == KeyModifiers.Alt && _viewModel is not null)
         {
@@ -480,6 +494,14 @@ public partial class MainWindow : Window
     private void OnWindowKeyUp(object? sender, KeyEventArgs e)
     {
         TrackDoubleShift(e, down: false);
+        if (e.Key == Key.RightAlt && _viewModel?.Localisation.ShowIds == true)
+        {
+            e.Handled = true;
+            _viewModel.Localisation.ShowIds = false;
+            // Releasing Alt has just opened the main menu (the window's access keys come first); not for Right Alt.
+            MainMenu.Close();
+            return;
+        }
         if (e.Key is Key.LeftCtrl or Key.RightCtrl && _viewModel?.IsSwitching == true)
         {
             e.Handled = true;
@@ -487,15 +509,40 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>The id under the caret: letters, digits and <c>_ . : @ -</c>.</summary>
-    private string? WordAtCaret()
+    private static bool IsUsagesClick(PointerPressedEventArgs e, Visual relativeTo) =>
+        e.KeyModifiers == KeyModifiers.Control && e.GetCurrentPoint(relativeTo).Properties.IsLeftButtonPressed;
+
+    private void OnEditorCtrlClick(object? sender, PointerPressedEventArgs e)
     {
-        if (_shownTab is null)
-            return null;
+        var textView = Editor.TextArea.TextView;
+        if (_viewModel is null || _shownTab is null || !IsUsagesClick(e, textView)
+            || textView.GetPosition(e.GetPosition(textView) + textView.ScrollOffset) is not { } position)
+            return;
+        e.Handled = true;
+        var offset = Editor.Document.GetOffset(position.Location);
+        Editor.CaretOffset = offset;
+        _viewModel.FindUsages(WordAt(offset));
+    }
+
+    private void OnContentTreeCtrlClick(object? sender, PointerPressedEventArgs e)
+    {
+        if (_viewModel is null || !IsUsagesClick(e, ContentTreeView)
+            || (e.Source as Control)?.DataContext is not ContentNodeViewModel { HasLocation: true } node)
+            return;
+        e.Handled = true;
+        _viewModel.ProjectTree.SelectedContentNode = node;
+        _viewModel.FindUsages(node.Name);
+    }
+
+    private string? WordAtCaret() => _shownTab is null ? null : WordAt(Editor.CaretOffset);
+
+    /// <summary>The id at <paramref name="offset"/>: letters, digits and <c>_ . : @ -</c>.</summary>
+    private string? WordAt(int offset)
+    {
         var document = Editor.Document;
-        var line = document.GetLineByOffset(Editor.CaretOffset);
+        var line = document.GetLineByOffset(offset);
         var text = document.GetText(line);
-        var column = Editor.CaretOffset - line.Offset;
+        var column = offset - line.Offset;
         static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c is '_' or '.' or ':' or '@' or '-';
         var start = column;
         while (start > 0 && IsWordChar(text[start - 1]))
@@ -603,5 +650,62 @@ public partial class MainWindow : Window
             _viewModel?.CloseTab(tab);
             e.Handled = true;
         }
+    }
+
+    // Right click: closing tabs, without switching to the one clicked. With Shift, "the nearest" becomes "all".
+    private void OnTabStripPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (_viewModel is not { } viewModel || !e.GetCurrentPoint(TabStrip).Properties.IsRightButtonPressed
+            || e.Source is not Control { DataContext: DocumentTabViewModel tab } source)
+            return;
+        e.Handled = true;
+
+        var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        var close = new MenuItem();
+        var left = new MenuItem();
+        var right = new MenuItem();
+        var all = new MenuItem { Header = "Закрити всі" };
+        close.Click += (_, _) =>
+        {
+            if (shift)
+                viewModel.CloseOtherTabs(tab);
+            else
+                viewModel.CloseTab(tab);
+        };
+        left.Click += (_, _) => viewModel.CloseTabs(viewModel.TabsBeside(tab, left: true, all: shift));
+        right.Click += (_, _) => viewModel.CloseTabs(viewModel.TabsBeside(tab, left: false, all: shift));
+        all.Click += (_, _) => viewModel.CloseTabs(viewModel.Tabs);
+
+        void Update()
+        {
+            close.Header = shift ? "Закрити інші вкладки" : "Закрити";
+            close.InputGesture = shift ? null : new KeyGesture(Key.F4, KeyModifiers.Control);
+            close.IsEnabled = !shift || viewModel.Tabs.Count > 1;
+            left.Header = shift ? "Закрити вкладки зліва" : "Закрити вкладку зліва";
+            left.IsEnabled = viewModel.TabsBeside(tab, left: true, all: false).Count > 0;
+            right.Header = shift ? "Закрити вкладки справа" : "Закрити вкладку справа";
+            right.IsEnabled = viewModel.TabsBeside(tab, left: false, all: false).Count > 0;
+        }
+        Update();
+
+        var menu = new ContextMenu { Items = { close, left, right, new Separator(), all } };
+        // Shift pressed or released while the menu is open switches it; the keys reach the menu or the window.
+        void OnKey(object? s, KeyEventArgs k)
+        {
+            if (k.Key is not (Key.LeftShift or Key.RightShift))
+                return;
+            shift = k.KeyModifiers.HasFlag(KeyModifiers.Shift);
+            Update();
+        }
+        menu.AddHandler(KeyDownEvent, OnKey, RoutingStrategies.Tunnel, handledEventsToo: true);
+        menu.AddHandler(KeyUpEvent, OnKey, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(KeyDownEvent, OnKey, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(KeyUpEvent, OnKey, RoutingStrategies.Tunnel, handledEventsToo: true);
+        menu.Closed += (_, _) =>
+        {
+            RemoveHandler(KeyDownEvent, OnKey);
+            RemoveHandler(KeyUpEvent, OnKey);
+        };
+        menu.Open(source);
     }
 }
